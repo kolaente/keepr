@@ -96,3 +96,87 @@ servers:
 		t.Errorf("Server1 Type = %q, want remote", cfg.Servers[0].Type)
 	}
 }
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr bool
+	}{
+		{
+			name: "missing backup_base_path",
+			yaml: `
+servers:
+  - name: server1
+    host: example.com
+    paths:
+      - remote: /data
+`,
+			wantErr: true,
+		},
+		{
+			name: "duplicate server names",
+			yaml: `
+backup_base_path: /backups
+servers:
+  - name: server1
+    host: example.com
+    paths:
+      - remote: /data
+  - name: server1
+    host: other.com
+    paths:
+      - remote: /data
+`,
+			wantErr: true,
+		},
+		{
+			name: "remote server missing host",
+			yaml: `
+backup_base_path: /backups
+servers:
+  - name: server1
+    type: remote
+    paths:
+      - remote: /data
+`,
+			wantErr: true,
+		},
+		{
+			name: "server missing paths",
+			yaml: `
+backup_base_path: /backups
+servers:
+  - name: server1
+    host: example.com
+`,
+			wantErr: true,
+		},
+		{
+			name: "valid config",
+			yaml: `
+backup_base_path: /backups
+servers:
+  - name: server1
+    host: example.com
+    paths:
+      - remote: /data
+`,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := Parse(strings.NewReader(tt.yaml))
+			if err != nil {
+				t.Fatalf("Parse failed: %v", err)
+			}
+			cfg.ApplyDefaults()
+			err = cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"io"
 
 	"gopkg.in/yaml.v3"
@@ -78,4 +80,31 @@ func (c *Config) ApplyDefaults() {
 			s.RetentionDays = c.Defaults.RetentionDays
 		}
 	}
+}
+
+func (c *Config) Validate() error {
+	if c.BackupBasePath == "" {
+		return errors.New("backup_base_path is required")
+	}
+
+	// Check for duplicate server names
+	seen := make(map[string]bool)
+	for _, s := range c.Servers {
+		if seen[s.Name] {
+			return fmt.Errorf("duplicate server name: %s", s.Name)
+		}
+		seen[s.Name] = true
+
+		// Check remote servers have host
+		if s.Type == "remote" && s.Host == "" {
+			return fmt.Errorf("server %s: remote server requires host", s.Name)
+		}
+
+		// Check all servers have at least one path
+		if len(s.Paths) == 0 {
+			return fmt.Errorf("server %s: at least one path is required", s.Name)
+		}
+	}
+
+	return nil
 }
