@@ -36,7 +36,7 @@ let
       rev = "main";  # Or pin to a specific commit hash
       hash = "";  # Nix will error with the correct hash on first build
     };
-    vendorHash = null;
+    vendorHash = "";  # Nix will error with the correct hash on first build
   };
 in {
   environment.etc."keepr/config.yaml".source = ./keepr-config.yaml;
