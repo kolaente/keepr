@@ -1,0 +1,73 @@
+# Keepr Configuration Example
+# Copy this file to config.yaml and modify as needed
+
+# Base path where all backups will be stored
+backup_base_path: /backups
+
+# Web server configuration
+web:
+  # Address to listen on for the web dashboard
+  listen: ":8080"
+
+# Default values applied to all servers unless overridden
+defaults:
+  # SSH user for remote connections
+  user: backup
+  # SSH port for remote connections
+  port: 22
+  # Number of days to keep old backup versions
+  retention_days: 7
+  # Cron schedule for backups (daily at 2am)
+  schedule: "0 2 * * *"
+
+# Server configurations
+servers:
+  # Remote server example with multiple paths
+  - name: webserver
+    type: remote
+    host: web.example.com
+    # SSH key for authentication
+    key: /home/backup/.ssh/id_rsa
+    paths:
+      # Web root backup
+      - remote: /var/www
+        local: /backups/webserver/www
+      # Nginx config backup with versioned copies
+      - remote: /etc/nginx
+        local: /backups/webserver/nginx
+        backup_dir: /backups/webserver/nginx.versions
+
+  # Remote server with custom port
+  - name: dbserver
+    type: remote
+    host: db.example.com
+    port: 2222
+    user: admin
+    key: /home/backup/.ssh/db_key
+    # Custom schedule - every 6 hours
+    schedule: "0 */6 * * *"
+    # Keep backups for 30 days
+    retention_days: 30
+    paths:
+      - remote: /var/lib/mysql/backups
+        local: /backups/dbserver/mysql
+
+  # Local backup example
+  - name: local-configs
+    type: local
+    # No schedule - manual runs only
+    paths:
+      - remote: /etc
+        local: /backups/local/etc
+
+  # Local backup with hooks (e.g., database dump)
+  - name: postgres-backup
+    type: local
+    schedule: "0 3 * * *"
+    # Command to run before backup
+    pre_hook: "sudo -u postgres pg_dumpall > /var/backups/postgres/dump.sql"
+    # Command to run after backup
+    post_hook: "rm /var/backups/postgres/dump.sql"
+    paths:
+      - remote: /var/backups/postgres
+        local: /backups/postgres
