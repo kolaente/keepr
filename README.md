@@ -18,6 +18,66 @@ go build -o keepr .
 sudo mv keepr /usr/local/bin/
 ```
 
+### NixOS
+
+Add the following module to your NixOS configuration:
+
+```nix
+# keepr.nix
+{ config, lib, pkgs, ... }:
+
+let
+  keepr = pkgs.buildGoModule {
+    pname = "keepr";
+    version = "latest";
+    src = pkgs.fetchFromGitHub {
+      owner = "kolaente";
+      repo = "keepr";
+      rev = "main";  # Or pin to a specific commit hash
+      hash = "";  # Nix will error with the correct hash on first build
+    };
+    vendorHash = null;
+  };
+in {
+  environment.etc."keepr/config.yaml".source = ./keepr-config.yaml;
+
+  systemd.services.keepr = {
+    description = "Keepr Backup Service";
+    after = [ "network.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${keepr}/bin/keepr serve --config /etc/keepr/config.yaml";
+      Restart = "on-failure";
+      User = "keepr";
+      Group = "keepr";
+    };
+
+    path = [ pkgs.rsync pkgs.openssh ];
+  };
+
+  users.users.keepr = {
+    isSystemUser = true;
+    group = "keepr";
+    home = "/var/lib/keepr";
+    createHome = true;
+  };
+  users.groups.keepr = {};
+
+  # Optional: open firewall for web UI
+  # networking.firewall.allowedTCPPorts = [ 8080 ];
+}
+```
+
+Then import it in your `configuration.nix`:
+
+```nix
+imports = [ ./keepr.nix ];
+```
+
+Create your `keepr-config.yaml` alongside the module and run `nixos-rebuild switch`.
+
 ## Usage
 
 ### Start the backup service
