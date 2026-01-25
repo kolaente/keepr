@@ -47,3 +47,52 @@ servers:
 		t.Errorf("Server.Host = %q, want example.com", srv.Host)
 	}
 }
+
+func TestApplyDefaults(t *testing.T) {
+	yaml := `
+backup_base_path: /backups
+defaults:
+  user: backup
+  port: 42541
+  retention_days: 7
+servers:
+  - name: server1
+    host: example.com
+    port: 22
+  - name: server2
+    host: other.com
+`
+	cfg, err := Parse(strings.NewReader(yaml))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	cfg.ApplyDefaults()
+
+	// Server1: port 22 should NOT be overridden by default 42541
+	if cfg.Servers[0].Port != 22 {
+		t.Errorf("Server1 Port = %d, want 22 (should not be overridden)", cfg.Servers[0].Port)
+	}
+	// Server1: user should be applied from defaults
+	if cfg.Servers[0].User != "backup" {
+		t.Errorf("Server1 User = %q, want backup", cfg.Servers[0].User)
+	}
+	// Server1: retention_days should be applied from defaults
+	if cfg.Servers[0].RetentionDays != 7 {
+		t.Errorf("Server1 RetentionDays = %d, want 7", cfg.Servers[0].RetentionDays)
+	}
+
+	// Server2: port should be applied from defaults (was 0)
+	if cfg.Servers[1].Port != 42541 {
+		t.Errorf("Server2 Port = %d, want 42541", cfg.Servers[1].Port)
+	}
+	// Server2: user should be applied from defaults
+	if cfg.Servers[1].User != "backup" {
+		t.Errorf("Server2 User = %q, want backup", cfg.Servers[1].User)
+	}
+
+	// Type should default to "remote" when empty
+	if cfg.Servers[0].Type != "remote" {
+		t.Errorf("Server1 Type = %q, want remote", cfg.Servers[0].Type)
+	}
+}
