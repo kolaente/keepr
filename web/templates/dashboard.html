@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepr - Dashboard</title>
+    <meta http-equiv="refresh" content="5">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-idle { background: #95a5a6; }
+        .status-running {
+            background: #f39c12;
+            animation: pulse 1.5s infinite;
+        }
+        .status-success { background: #27ae60; }
+        .status-failed_pre_hook,
+        .status-failed_backup,
+        .status-failed_post_hook { background: #e74c3c; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        /* Desktop table */
+        .server-table {
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-collapse: collapse;
+            overflow: hidden;
+        }
+        .server-table th,
+        .server-table td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .server-table th {
+            background: #34495e;
+            color: white;
+            font-weight: 500;
+        }
+        .server-table tr:hover {
+            background: #f8f9fa;
+        }
+        .server-table a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .server-table a:hover {
+            text-decoration: underline;
+        }
+
+        /* Mobile cards */
+        .server-cards {
+            display: none;
+        }
+        .server-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .server-card h3 {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        .server-card h3 a {
+            color: #2c3e50;
+            text-decoration: none;
+        }
+        .server-card .info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+        .server-card .label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        @media (max-width: 768px) {
+            .server-table { display: none; }
+            .server-cards { display: block; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Keepr Dashboard</h1>
+
+        <!-- Desktop table view -->
+        <table class="server-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Last Run</th>
+                    <th>Next Run</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Servers}}
+                <tr>
+                    <td><a href="/logs/{{.Name}}">{{.Name}}</a></td>
+                    <td><span class="status-dot status-{{.Status}}"></span>{{.Status}}</td>
+                    <td>{{if .LastRun.IsZero}}-{{else}}{{.LastRun.Format "2006-01-02 15:04:05"}}{{end}}</td>
+                    <td>{{if .NextRun.IsZero}}-{{else}}{{.NextRun.Format "2006-01-02 15:04:05"}}{{end}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+
+        <!-- Mobile card view -->
+        <div class="server-cards">
+            {{range .Servers}}
+            <div class="server-card">
+                <h3><span class="status-dot status-{{.Status}}"></span><a href="/logs/{{.Name}}">{{.Name}}</a></h3>
+                <div class="info">
+                    <span class="label">Status:</span>
+                    <span>{{.Status}}</span>
+                    <span class="label">Last Run:</span>
+                    <span>{{if .LastRun.IsZero}}-{{else}}{{.LastRun.Format "2006-01-02 15:04"}}{{end}}</span>
+                    <span class="label">Next Run:</span>
+                    <span>{{if .NextRun.IsZero}}-{{else}}{{.NextRun.Format "2006-01-02 15:04"}}{{end}}</span>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+</body>
+</html>
