@@ -13,7 +13,7 @@ func TestDashboard(t *testing.T) {
 	sm := state.New()
 	sm.SetSuccess("server1")
 
-	srv := New(sm, nil)
+	srv := New(sm, nil, nil)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -35,7 +35,7 @@ func TestLogs(t *testing.T) {
 	sm.SetSuccess("server1")
 	sm.AppendLog("server1", "test log line")
 
-	srv := New(sm, nil)
+	srv := New(sm, nil, nil)
 
 	req := httptest.NewRequest("GET", "/logs/server1", nil)
 	w := httptest.NewRecorder()

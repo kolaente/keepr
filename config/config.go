@@ -17,7 +17,8 @@ type Config struct {
 }
 
 type WebConfig struct {
-	Listen string `yaml:"listen"`
+	Listen    string `yaml:"listen"`
+	APISecret string `yaml:"api_secret"`
 }
 
 type Server struct {

@@ -2,6 +2,7 @@ package web
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -11,12 +12,18 @@ import (
 	"keepr/state"
 )
 
+// BackupRunner is the interface for triggering backups
+type BackupRunner interface {
+	Run(server config.Server) error
+}
+
 //go:embed templates/*.html
 var templates embed.FS
 
 type Server struct {
 	state     *state.Manager
 	config    *config.Config
+	runner    BackupRunner
 	mux       *http.ServeMux
 	templates *template.Template
 }
@@ -38,10 +45,11 @@ type LogsData struct {
 	Logs   []string
 }
 
-func New(sm *state.Manager, cfg *config.Config) *Server {
+func New(sm *state.Manager, cfg *config.Config, runner BackupRunner) *Server {
 	s := &Server{
 		state:  sm,
 		config: cfg,
+		runner: runner,
 		mux:    http.NewServeMux(),
 	}
 
@@ -54,6 +62,8 @@ func New(sm *state.Manager, cfg *config.Config) *Server {
 	s.mux.HandleFunc("/", s.handleDashboard)
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/api/logs/", s.handleLogsAPI)
+	s.mux.HandleFunc("/api/run/", s.handleRunAPI)
+	s.mux.HandleFunc("/api/status/", s.handleStatusAPI)
 
 	return s
 }
@@ -150,4 +160,94 @@ func (s *Server) handleLogsAPI(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(500 * time.Millisecond)
 		}
 	}
+}
+
+func (s *Server) handleRunAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check API secret
+	if s.config.Web.APISecret == "" {
+		http.Error(w, "api not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	expectedAuth := "Bearer " + s.config.Web.APISecret
+	if authHeader != expectedAuth {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Extract server name from /api/run/{name}
+	name := r.URL.Path[len("/api/run/"):]
+	if name == "" {
+		http.Error(w, "server name required", http.StatusBadRequest)
+		return
+	}
+
+	// Find server in config
+	var server *config.Server
+	for i := range s.config.Servers {
+		if s.config.Servers[i].Name == name {
+			server = &s.config.Servers[i]
+			break
+		}
+	}
+	if server == nil {
+		http.Error(w, "server not found", http.StatusNotFound)
+		return
+	}
+
+	// Run backup in background
+	go func() {
+		_ = s.runner.Run(*server)
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status":  "started",
+		"server":  name,
+		"message": "backup started in background",
+	})
+}
+
+func (s *Server) handleStatusAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check API secret
+	if s.config.Web.APISecret == "" {
+		http.Error(w, "api not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	expectedAuth := "Bearer " + s.config.Web.APISecret
+	if authHeader != expectedAuth {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Extract server name from /api/status/{name}
+	name := r.URL.Path[len("/api/status/"):]
+	if name == "" {
+		http.Error(w, "server name required", http.StatusBadRequest)
+		return
+	}
+
+	srv := s.state.Get(name)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"name":       srv.Name,
+		"status":     srv.Status,
+		"started_at": srv.StartedAt,
+		"last_run":   srv.LastRun,
+	})
 }

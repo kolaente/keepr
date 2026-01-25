@@ -65,6 +65,9 @@ in {
   };
   users.groups.keepr = {};
 
+  # Add keepr CLI to system path
+  environment.systemPackages = [ keepr ];
+
   # Optional: open firewall for web UI
   # networking.firewall.allowedTCPPorts = [ 8080 ];
 }
