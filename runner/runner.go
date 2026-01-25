@@ -59,8 +59,8 @@ func (r *Runner) Run(server config.Server) error {
 		logFn(fmt.Sprintf("Syncing %s -> %s", path.Remote, path.Local))
 		if err := RunRsync(ctx, server, path, r.config.BackupBasePath, logFn); err != nil {
 			logFn(fmt.Sprintf("Rsync failed: %v", err))
-			// Still run post-hook even if rsync fails
-			r.runPostHook(ctx, server, logFn)
+			// Still run post-hook even if rsync fails (ignore its error)
+			_ = r.runPostHook(ctx, server, logFn)
 			r.state.SetFailed(name, state.StatusFailedBackup)
 			return err
 		}
@@ -120,7 +120,7 @@ func (r *Runner) callHeartbeat(url string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("heartbeat returned status %d", resp.StatusCode)
 	}

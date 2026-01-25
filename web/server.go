@@ -142,7 +142,7 @@ func (s *Server) handleLogsAPI(w http.ResponseWriter, r *http.Request) {
 			logs := s.state.GetLogs(name)
 			if len(logs) > lastCount {
 				for _, line := range logs[lastCount:] {
-					fmt.Fprintf(w, "data: %s\n\n", line)
+					_, _ = fmt.Fprintf(w, "data: %s\n\n", line)
 				}
 				lastCount = len(logs)
 				flusher.Flush()

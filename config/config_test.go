@@ -199,7 +199,7 @@ servers:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	if _, err := tmpfile.Write(content); err != nil {
 		t.Fatalf("Failed to write temp file: %v", err)
@@ -248,7 +248,7 @@ servers:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	if _, err := tmpfile.Write(content); err != nil {
 		t.Fatalf("Failed to write temp file: %v", err)

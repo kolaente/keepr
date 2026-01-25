@@ -131,7 +131,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	log.Println("Shutting down...")
 	sched.Stop()
-	httpServer.Close()
+	_ = httpServer.Close()
 	log.Println("Goodbye!")
 
 	return nil

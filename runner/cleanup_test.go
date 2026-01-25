@@ -13,7 +13,7 @@ func TestCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create server directory with _old subdirectory
 	serverDir := filepath.Join(tmpDir, "testserver")
@@ -69,7 +69,7 @@ func TestCleanup_NoOldDirs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	serverDir := filepath.Join(tmpDir, "testserver")
 	normalDir := filepath.Join(serverDir, "data")
@@ -110,7 +110,7 @@ func TestCleanupEmptyDirs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	serverDir := filepath.Join(tmpDir, "testserver")
 	emptyOldDir := filepath.Join(serverDir, "data_old")

@@ -54,7 +54,7 @@ func LoadFile(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	cfg, err := Parse(f)
 	if err != nil {
