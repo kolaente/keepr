@@ -210,14 +210,15 @@ func runBackup(cmd *cobra.Command, args []string) error {
 			failed = append(failed, name)
 			continue
 		}
-		resp.Body.Close()
 
 		if resp.StatusCode != http.StatusAccepted {
 			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			fmt.Printf("  ✗ Failed: %s\n", string(body))
 			failed = append(failed, name)
 			continue
 		}
+		resp.Body.Close()
 
 		// Poll for completion
 		if err := waitForCompletion(client, baseURL, cfg.Web.APISecret, name); err != nil {
