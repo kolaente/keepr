@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -38,8 +39,12 @@ func RunHook(ctx context.Context, command string, timeout time.Duration, logFn L
 		return fmt.Errorf("failed to start hook: %w", err)
 	}
 
+	var wg sync.WaitGroup
+
 	// Stream stdout with [hook] prefix
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
 			if logFn != nil {
@@ -49,7 +54,9 @@ func RunHook(ctx context.Context, command string, timeout time.Duration, logFn L
 	}()
 
 	// Stream stderr with [hook] prefix
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			if logFn != nil {
@@ -57,6 +64,9 @@ func RunHook(ctx context.Context, command string, timeout time.Duration, logFn L
 			}
 		}
 	}()
+
+	// Wait for output goroutines to finish before checking error
+	wg.Wait()
 
 	err = cmd.Wait()
 	if ctx.Err() == context.DeadlineExceeded {
