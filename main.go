@@ -38,11 +38,18 @@ var runCmd = &cobra.Command{
 	RunE:  runBackup,
 }
 
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show configured servers and their schedules",
+	RunE:  showStatus,
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/etc/keepr/config.yaml", "config file path")
 	runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "run backup for all servers")
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(statusCmd)
 }
 
 func main() {
@@ -184,5 +191,32 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Success: %d/%d servers\n", len(serversToRun), len(serversToRun))
+	return nil
+}
+
+func showStatus(cmd *cobra.Command, args []string) error {
+	// Load config
+	cfg, err := config.LoadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Print header
+	fmt.Printf("%-20s %-10s %s\n", "SERVER", "TYPE", "SCHEDULE")
+	fmt.Printf("%-20s %-10s %s\n", "------", "----", "--------")
+
+	// Print each server
+	for _, server := range cfg.Servers {
+		schedule := server.Schedule
+		if schedule == "" {
+			schedule = "(no schedule)"
+		}
+		serverType := server.Type
+		if serverType == "" {
+			serverType = "remote"
+		}
+		fmt.Printf("%-20s %-10s %s\n", server.Name, serverType, schedule)
+	}
+
 	return nil
 }
