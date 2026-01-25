@@ -18,6 +18,7 @@ import (
 )
 
 var configPath string
+var runAll bool
 
 var rootCmd = &cobra.Command{
 	Use:   "keepr",
@@ -30,9 +31,18 @@ var serveCmd = &cobra.Command{
 	RunE:  runServe,
 }
 
+var runCmd = &cobra.Command{
+	Use:   "run [server-name]",
+	Short: "Run backup manually",
+	Long:  "Run backup for a specific server or all servers",
+	RunE:  runBackup,
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/etc/keepr/config.yaml", "config file path")
+	runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "run backup for all servers")
 	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(runCmd)
 }
 
 func main() {
@@ -117,5 +127,62 @@ func runServe(cmd *cobra.Command, args []string) error {
 	httpServer.Close()
 	log.Println("Goodbye!")
 
+	return nil
+}
+
+func runBackup(cmd *cobra.Command, args []string) error {
+	// Load config
+	cfg, err := config.LoadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Create state manager and runner
+	sm := state.New()
+	r := runner.New(cfg, sm)
+
+	// Determine which servers to run
+	var serversToRun []config.Server
+
+	if runAll {
+		serversToRun = cfg.Servers
+	} else if len(args) > 0 {
+		serverName := args[0]
+		for _, s := range cfg.Servers {
+			if s.Name == serverName {
+				serversToRun = append(serversToRun, s)
+				break
+			}
+		}
+		if len(serversToRun) == 0 {
+			return fmt.Errorf("server not found: %s", serverName)
+		}
+	} else {
+		return fmt.Errorf("specify a server name or use --all")
+	}
+
+	// Run backups
+	var failed []string
+	for _, server := range serversToRun {
+		fmt.Printf("Running backup for %s...\n", server.Name)
+		if err := r.Run(server); err != nil {
+			fmt.Printf("  ✗ Failed: %v\n", err)
+			failed = append(failed, server.Name)
+		} else {
+			fmt.Printf("  ✓ Completed\n")
+		}
+	}
+
+	// Print summary
+	fmt.Println()
+	if len(failed) > 0 {
+		fmt.Printf("Failed: %d/%d servers\n", len(failed), len(serversToRun))
+		for _, name := range failed {
+			fmt.Printf("  - %s\n", name)
+		}
+		return fmt.Errorf("some backups failed")
+	}
+
+	fmt.Printf("Success: %d/%d servers\n", len(serversToRun), len(serversToRun))
 	return nil
 }
