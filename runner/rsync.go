@@ -1,7 +1,11 @@
 package runner
 
 import (
+	"bufio"
+	"context"
 	"fmt"
+	"os/exec"
+	"path/filepath"
 
 	"keepr/config"
 )
@@ -36,4 +40,68 @@ func BuildRsyncArgs(server config.Server, path config.Path) []string {
 	args = append(args, source, path.Local)
 
 	return args
+}
+
+// RunRsync executes rsync for a server/path pair and streams output to logFn
+func RunRsync(ctx context.Context, server config.Server, path config.Path, basePath string, logFn LogFunc) error {
+	args := BuildRsyncArgs(server, path)
+
+	// Ensure destination directory exists
+	destDir := filepath.Dir(path.Local)
+	if err := exec.CommandContext(ctx, "mkdir", "-p", destDir).Run(); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, "rsync", args...)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("failed to get stdout pipe: %w", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("failed to get stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start rsync: %w", err)
+	}
+
+	// Stream stdout
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			if logFn != nil {
+				logFn(scanner.Text())
+			}
+		}
+	}()
+
+	// Stream stderr
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			if logFn != nil {
+				logFn("[stderr] " + scanner.Text())
+			}
+		}
+	}()
+
+	err = cmd.Wait()
+	exitCode := 0
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		exitCode = exitErr.ExitCode()
+	}
+
+	return checkRsyncError(err, exitCode)
+}
+
+// checkRsyncError checks if rsync exit code indicates success
+// Exit code 24 means "some files vanished" which is common and acceptable
+func checkRsyncError(err error, exitCode int) error {
+	if exitCode == 0 || exitCode == 24 {
+		return nil
+	}
+	return err
 }

@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"keepr/config"
@@ -110,5 +112,29 @@ func TestBuildRsyncArgs_Remote(t *testing.T) {
 	}
 	if dest != "/backups/server/data" {
 		t.Errorf("Dest = %q, want /backups/server/data", dest)
+	}
+}
+
+func TestCheckRsyncError_ExitCode24IsSuccess(t *testing.T) {
+	// Exit code 24 means "some files vanished before they could be transferred"
+	// This is common and should be treated as success
+	err := checkRsyncError(&exec.ExitError{ProcessState: nil}, 24)
+	if err != nil {
+		t.Errorf("Exit code 24 should be success, got error: %v", err)
+	}
+}
+
+func TestCheckRsyncError_ExitCode0IsSuccess(t *testing.T) {
+	err := checkRsyncError(nil, 0)
+	if err != nil {
+		t.Errorf("Exit code 0 should be success, got error: %v", err)
+	}
+}
+
+func TestCheckRsyncError_OtherExitCodesAreErrors(t *testing.T) {
+	testErr := fmt.Errorf("process exited with code 1")
+	err := checkRsyncError(testErr, 1)
+	if err == nil {
+		t.Error("Exit code 1 should be an error")
 	}
 }
