@@ -1,6 +1,7 @@
 package state
 
 import (
+	"sort"
 	"sync"
 	"time"
 )
@@ -67,6 +68,9 @@ func (m *Manager) All() []ServerState {
 	for _, s := range m.states {
 		result = append(result, *s)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 	return result
 }
 
