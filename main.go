@@ -213,12 +213,12 @@ func runBackup(cmd *cobra.Command, args []string) error {
 
 		if resp.StatusCode != http.StatusAccepted {
 			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			fmt.Printf("  ✗ Failed: %s\n", string(body))
 			failed = append(failed, name)
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// Poll for completion
 		if err := waitForCompletion(client, baseURL, cfg.Web.APISecret, name); err != nil {
@@ -264,10 +264,10 @@ func waitForCompletion(client *http.Client, baseURL, secret, name string) error 
 			Status string `json:"status"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return err
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		switch status.Status {
 		case "success":
