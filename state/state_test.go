@@ -69,3 +69,49 @@ func TestSetNextRun(t *testing.T) {
 		t.Errorf("NextRun = %v, want %v", s.NextRun, nextRun)
 	}
 }
+
+func TestLogBuffer(t *testing.T) {
+	mgr := New()
+
+	// AppendLog adds lines
+	mgr.AppendLog("server1", "line 1")
+	mgr.AppendLog("server1", "line 2")
+	mgr.AppendLog("server1", "line 3")
+
+	// GetLogs returns all lines in order
+	logs := mgr.GetLogs("server1")
+	if len(logs) != 3 {
+		t.Fatalf("len(logs) = %d, want 3", len(logs))
+	}
+	if logs[0] != "line 1" || logs[1] != "line 2" || logs[2] != "line 3" {
+		t.Errorf("logs = %v, want [line 1, line 2, line 3]", logs)
+	}
+
+	// ClearLogs removes all lines
+	mgr.ClearLogs("server1")
+	logs = mgr.GetLogs("server1")
+	if len(logs) != 0 {
+		t.Errorf("len(logs) after clear = %d, want 0", len(logs))
+	}
+}
+
+func TestLogBufferMaxSize(t *testing.T) {
+	mgr := NewWithLogSize(3)
+
+	// Add 5 lines to a buffer of size 3
+	mgr.AppendLog("server1", "line 1")
+	mgr.AppendLog("server1", "line 2")
+	mgr.AppendLog("server1", "line 3")
+	mgr.AppendLog("server1", "line 4")
+	mgr.AppendLog("server1", "line 5")
+
+	// Oldest lines should be dropped
+	logs := mgr.GetLogs("server1")
+	if len(logs) != 3 {
+		t.Fatalf("len(logs) = %d, want 3", len(logs))
+	}
+	// Should have lines 3, 4, 5 (oldest dropped)
+	if logs[0] != "line 3" || logs[1] != "line 4" || logs[2] != "line 5" {
+		t.Errorf("logs = %v, want [line 3, line 4, line 5]", logs)
+	}
+}

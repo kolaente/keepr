@@ -16,6 +16,8 @@ const (
 	StatusFailedPostHook Status = "failed_post_hook"
 )
 
+const DefaultLogSize = 1000
+
 type ServerState struct {
 	Name      string
 	Status    Status
@@ -25,13 +27,21 @@ type ServerState struct {
 }
 
 type Manager struct {
-	mu     sync.RWMutex
-	states map[string]*ServerState
+	mu      sync.RWMutex
+	states  map[string]*ServerState
+	logs    map[string][]string
+	logSize int
 }
 
 func New() *Manager {
+	return NewWithLogSize(DefaultLogSize)
+}
+
+func NewWithLogSize(size int) *Manager {
 	return &Manager{
-		states: make(map[string]*ServerState),
+		states:  make(map[string]*ServerState),
+		logs:    make(map[string][]string),
+		logSize: size,
 	}
 }
 
@@ -89,4 +99,36 @@ func (m *Manager) SetNextRun(name string, t time.Time) {
 	defer m.mu.Unlock()
 	s := m.get(name)
 	s.NextRun = t
+}
+
+func (m *Manager) AppendLog(name, line string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.logs[name] = append(m.logs[name], line)
+
+	// Ring buffer: drop oldest if exceeding size
+	if len(m.logs[name]) > m.logSize {
+		m.logs[name] = m.logs[name][len(m.logs[name])-m.logSize:]
+	}
+}
+
+func (m *Manager) GetLogs(name string) []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	logs := m.logs[name]
+	if logs == nil {
+		return []string{}
+	}
+	// Return a copy to avoid race conditions
+	result := make([]string, len(logs))
+	copy(result, logs)
+	return result
+}
+
+func (m *Manager) ClearLogs(name string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.logs, name)
 }
