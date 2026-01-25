@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -178,5 +179,86 @@ servers:
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestLoadFile(t *testing.T) {
+	// Create temp file with valid YAML config
+	content := []byte(`
+backup_base_path: /backups
+web:
+  listen: ":8080"
+servers:
+  - name: server1
+    host: example.com
+    port: 22
+    paths:
+      - remote: /data
+`)
+	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	if _, err := tmpfile.Write(content); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
+
+	cfg, err := LoadFile(tmpfile.Name())
+	if err != nil {
+		t.Fatalf("LoadFile failed: %v", err)
+	}
+
+	if cfg.BackupBasePath != "/backups" {
+		t.Errorf("BackupBasePath = %q, want /backups", cfg.BackupBasePath)
+	}
+	if cfg.Web.Listen != ":8080" {
+		t.Errorf("Web.Listen = %q, want :8080", cfg.Web.Listen)
+	}
+	if len(cfg.Servers) != 1 {
+		t.Fatalf("len(Servers) = %d, want 1", len(cfg.Servers))
+	}
+	// Verify defaults were applied
+	if cfg.Servers[0].Type != "remote" {
+		t.Errorf("Server.Type = %q, want remote (from defaults)", cfg.Servers[0].Type)
+	}
+}
+
+func TestLoadFile_NotFound(t *testing.T) {
+	_, err := LoadFile("/nonexistent/path/config.yaml")
+	if err == nil {
+		t.Error("LoadFile should fail for nonexistent file")
+	}
+}
+
+func TestLoadFile_Invalid(t *testing.T) {
+	// Create temp file with invalid config (missing backup_base_path)
+	content := []byte(`
+servers:
+  - name: server1
+    host: example.com
+    paths:
+      - remote: /data
+`)
+	tmpfile, err := os.CreateTemp("", "config*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	if _, err := tmpfile.Write(content); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
+
+	_, err = LoadFile(tmpfile.Name())
+	if err == nil {
+		t.Error("LoadFile should fail for invalid config")
 	}
 }

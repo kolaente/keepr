@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"gopkg.in/yaml.v3"
 )
@@ -46,6 +47,27 @@ func Parse(r io.Reader) (*Config, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+func LoadFile(path string) (*Config, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	cfg, err := Parse(f)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.ApplyDefaults()
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 func (c *Config) ApplyDefaults() {
