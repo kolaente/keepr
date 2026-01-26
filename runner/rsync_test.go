@@ -69,8 +69,9 @@ func TestBuildRsyncArgs_Remote(t *testing.T) {
 		if arg == "-e" && i+1 < len(args) {
 			hasSSH = true
 			sshCmd := args[i+1]
-			if sshCmd != "ssh -p 22 -i /home/user/.ssh/id_rsa" {
-				t.Errorf("SSH command = %q, want ssh -p 22 -i /home/user/.ssh/id_rsa", sshCmd)
+			expected := "ssh -p 22 -o StrictHostKeyChecking=accept-new -o BatchMode=yes -i /home/user/.ssh/id_rsa"
+			if sshCmd != expected {
+				t.Errorf("SSH command = %q, want %q", sshCmd, expected)
 			}
 		}
 	}

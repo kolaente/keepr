@@ -18,7 +18,7 @@ func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []
 
 	// For remote servers, add SSH options
 	if server.Type == "remote" {
-		sshCmd := fmt.Sprintf("ssh -p %d", server.Port)
+		sshCmd := fmt.Sprintf("ssh -p %d -o StrictHostKeyChecking=accept-new -o BatchMode=yes", server.Port)
 		if server.Key != "" {
 			sshCmd += " -i " + server.Key
 		}
