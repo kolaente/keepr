@@ -139,3 +139,129 @@ func TestCheckBackupBasePath_NotWritable(t *testing.T) {
 		t.Error("Expected error for non-writable path")
 	}
 }
+
+func TestCheckSSHKeys_NoRemoteServers(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{Name: "local", Type: "local"},
+		},
+	}
+
+	errors := checkSSHKeys(cfg)
+
+	if len(errors) != 0 {
+		t.Errorf("Expected no errors for local-only servers, got: %v", errors)
+	}
+}
+
+func TestCheckSSHKeys_KeyExists(t *testing.T) {
+	// Create a temp file to act as SSH key
+	tmpFile, err := os.CreateTemp("", "test-ssh-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	// Set correct permissions
+	os.Chmod(tmpFile.Name(), 0600)
+
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{
+				Name: "remote",
+				Type: "remote",
+				Host: "example.com",
+				Key:  tmpFile.Name(),
+			},
+		},
+	}
+
+	errors := checkSSHKeys(cfg)
+
+	if len(errors) != 0 {
+		t.Errorf("Expected no errors for existing key, got: %v", errors)
+	}
+}
+
+func TestCheckSSHKeys_KeyNotExists(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{
+				Name: "remote",
+				Type: "remote",
+				Host: "example.com",
+				Key:  "/nonexistent/ssh/key",
+			},
+		},
+	}
+
+	errors := checkSSHKeys(cfg)
+
+	if len(errors) != 1 {
+		t.Errorf("Expected 1 error, got %d: %v", len(errors), errors)
+	}
+
+	if len(errors) > 0 && !strings.Contains(errors[0].Error(), "does not exist") {
+		t.Errorf("Error should mention key does not exist: %v", errors[0])
+	}
+}
+
+func TestCheckSSHKeys_KeyBadPermissions(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("Cannot test permissions as root")
+	}
+
+	// Create a temp file with bad permissions
+	tmpFile, err := os.CreateTemp("", "test-ssh-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	// Set world-readable permissions (bad for SSH keys)
+	os.Chmod(tmpFile.Name(), 0644)
+
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{
+				Name: "remote",
+				Type: "remote",
+				Host: "example.com",
+				Key:  tmpFile.Name(),
+			},
+		},
+	}
+
+	errors := checkSSHKeys(cfg)
+
+	if len(errors) != 1 {
+		t.Errorf("Expected 1 error for bad permissions, got %d: %v", len(errors), errors)
+	}
+
+	if len(errors) > 0 && !strings.Contains(errors[0].Error(), "permissions") {
+		t.Errorf("Error should mention permissions: %v", errors[0])
+	}
+}
+
+func TestCheckSSHKeys_NoKeyForRemote(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{
+				Name: "remote",
+				Type: "remote",
+				Host: "example.com",
+				// No Key specified
+			},
+		},
+	}
+
+	errors := checkSSHKeys(cfg)
+
+	// Warning but not error - SSH might use default key or agent
+	// This is acceptable, just log a warning
+	if len(errors) != 0 {
+		t.Errorf("No key specified should not be an error (might use ssh-agent), got: %v", errors)
+	}
+}

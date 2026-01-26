@@ -60,8 +60,46 @@ func checkBackupBasePath(cfg *config.Config) []error {
 
 // checkSSHKeys verifies SSH key files exist and have correct permissions
 func checkSSHKeys(cfg *config.Config) []error {
-	// Placeholder - will be implemented in keeper-6wz.4
-	return nil
+	var errors []error
+
+	for _, server := range cfg.Servers {
+		if server.Type != "remote" {
+			continue
+		}
+
+		// If no key specified, SSH will use defaults or agent - not an error
+		if server.Key == "" {
+			continue
+		}
+
+		// Check key file exists
+		info, err := os.Stat(server.Key)
+		if os.IsNotExist(err) {
+			errors = append(errors, fmt.Errorf(
+				"server %q: SSH key %q does not exist",
+				server.Name, server.Key,
+			))
+			continue
+		}
+		if err != nil {
+			errors = append(errors, fmt.Errorf(
+				"server %q: SSH key %q: %w",
+				server.Name, server.Key, err,
+			))
+			continue
+		}
+
+		// Check permissions (should be 0600 or 0400)
+		mode := info.Mode().Perm()
+		if mode&0077 != 0 {
+			errors = append(errors, fmt.Errorf(
+				"server %q: SSH key %q has insecure permissions %04o (should be 0600): run 'chmod 600 %s'",
+				server.Name, server.Key, mode, server.Key,
+			))
+		}
+	}
+
+	return errors
 }
 
 // checkCronSchedules validates all server cron schedules
