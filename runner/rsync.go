@@ -14,7 +14,7 @@ import (
 // BuildRsyncArgs builds the rsync command arguments for a given server and path.
 // The localPath parameter should be the resolved absolute path for the destination.
 func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []string {
-	args := []string{"-avz"}
+	args := []string{"-avz", "--no-group"}
 
 	// For remote servers, add SSH options
 	if server.Type == "remote" {
