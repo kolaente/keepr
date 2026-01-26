@@ -5,7 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keepr - Dashboard</title>
     <meta http-equiv="refresh" content="5">
+    <script>
+        (function() {
+            var theme = localStorage.getItem('keepr-theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
     <style>
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-header: #34495e;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --text-heading: #2c3e50;
+            --text-header: #ffffff;
+            --border-color: #eeeeee;
+            --hover-bg: #f8f9fa;
+            --link-color: #3498db;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+        [data-theme="dark"] {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-header: #0f3460;
+            --text-primary: #eeeeee;
+            --text-secondary: #aaaaaa;
+            --text-heading: #eeeeee;
+            --text-header: #eeeeee;
+            --border-color: #0f3460;
+            --hover-bg: rgba(255, 255, 255, 0.05);
+            --link-color: #5dade2;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
         * {
             margin: 0;
             padding: 0;
@@ -13,8 +47,8 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             line-height: 1.6;
         }
         .container {
@@ -22,9 +56,50 @@
             margin: 0 auto;
             padding: 20px;
         }
-        h1 {
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
-            color: #2c3e50;
+        }
+        h1 {
+            color: var(--text-heading);
+        }
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .theme-toggle input {
+            display: none;
+        }
+        .theme-toggle label {
+            width: 48px;
+            height: 26px;
+            background: var(--bg-header);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .theme-toggle label::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: var(--text-header);
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .theme-toggle input:checked + label::after {
+            transform: translateX(22px);
+        }
+        .theme-icon {
+            font-size: 16px;
         }
         .status-dot {
             display: inline-block;
@@ -51,9 +126,9 @@
         /* Desktop table */
         .server-table {
             width: 100%;
-            background: white;
+            background: var(--bg-secondary);
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px var(--shadow);
             border-collapse: collapse;
             overflow: hidden;
         }
@@ -61,18 +136,18 @@
         .server-table td {
             padding: 16px;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--border-color);
         }
         .server-table th {
-            background: #34495e;
-            color: white;
+            background: var(--bg-header);
+            color: var(--text-header);
             font-weight: 500;
         }
         .server-table tr:hover {
-            background: #f8f9fa;
+            background: var(--hover-bg);
         }
         .server-table a {
-            color: #3498db;
+            color: var(--link-color);
             text-decoration: none;
         }
         .server-table a:hover {
@@ -84,9 +159,9 @@
             display: none;
         }
         .server-card {
-            background: white;
+            background: var(--bg-secondary);
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px var(--shadow);
             padding: 16px;
             margin-bottom: 12px;
         }
@@ -96,7 +171,7 @@
             align-items: center;
         }
         .server-card h3 a {
-            color: #2c3e50;
+            color: var(--text-heading);
             text-decoration: none;
         }
         .server-card .info {
@@ -104,11 +179,11 @@
             grid-template-columns: 1fr 1fr;
             gap: 8px;
             font-size: 14px;
-            color: #666;
+            color: var(--text-secondary);
         }
         .server-card .label {
             font-weight: 500;
-            color: #333;
+            color: var(--text-primary);
         }
 
         @media (max-width: 768px) {
@@ -119,7 +194,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>Keepr Dashboard</h1>
+        <div class="header">
+            <h1>Keepr Dashboard</h1>
+            <div class="theme-toggle">
+                <span class="theme-icon">☀️</span>
+                <input type="checkbox" id="theme-switch">
+                <label for="theme-switch"></label>
+                <span class="theme-icon">🌙</span>
+            </div>
+        </div>
 
         <!-- Desktop table view -->
         <table class="server-table">
@@ -160,5 +243,38 @@
             {{end}}
         </div>
     </div>
+
+    <script>
+        (function() {
+            var themeSwitch = document.getElementById('theme-switch');
+            var storedTheme = localStorage.getItem('keepr-theme');
+            var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var isDark = storedTheme === 'dark' || (!storedTheme && systemDark);
+
+            themeSwitch.checked = isDark;
+
+            themeSwitch.addEventListener('change', function() {
+                if (this.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('keepr-theme', 'dark');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                    localStorage.setItem('keepr-theme', 'light');
+                }
+            });
+
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('keepr-theme')) {
+                    if (e.matches) {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                        themeSwitch.checked = true;
+                    } else {
+                        document.documentElement.removeAttribute('data-theme');
+                        themeSwitch.checked = false;
+                    }
+                }
+            });
+        })();
+    </script>
 </body>
 </html>
