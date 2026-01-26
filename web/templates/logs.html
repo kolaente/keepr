@@ -207,7 +207,9 @@
         }
 
         function connect() {
-            eventSource = new EventSource('/api/logs/{{.Name}}/stream');
+            // Count existing log lines to avoid duplicates
+            const initialCount = logContainer.querySelectorAll('.log-line').length;
+            eventSource = new EventSource('/api/logs/{{.Name}}/stream?from=' + initialCount);
 
             eventSource.onopen = function() {
                 connectionStatus.textContent = 'Connected';

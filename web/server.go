@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 	"time"
 
 	"keepr/config"
@@ -172,8 +173,13 @@ func (s *Server) handleLogsAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Track last log count to send only new logs
+	// Parse 'from' query parameter to skip already-rendered logs
 	lastCount := 0
+	if fromStr := r.URL.Query().Get("from"); fromStr != "" {
+		if from, err := strconv.Atoi(fromStr); err == nil && from >= 0 {
+			lastCount = from
+		}
+	}
 
 	for {
 		select {
