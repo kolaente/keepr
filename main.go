@@ -22,6 +22,7 @@ import (
 
 var configPath string
 var runAll bool
+var skipPreflight bool
 
 var rootCmd = &cobra.Command{
 	Use:   "keepr",
@@ -51,6 +52,7 @@ var statusCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/etc/keepr/config.yaml", "config file path")
 	runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "run backup for all servers")
+	serveCmd.Flags().BoolVar(&skipPreflight, "skip-preflight", false, "Skip preflight checks (not recommended)")
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(statusCmd)
@@ -70,16 +72,20 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Run preflight checks
-	fmt.Println("Running preflight checks...")
-	if errors := preflight.RunAll(cfg); len(errors) > 0 {
-		fmt.Println("Preflight checks failed:")
-		for _, err := range errors {
-			fmt.Printf("  ✗ %v\n", err)
+	// Run preflight checks (unless skipped)
+	if !skipPreflight {
+		fmt.Println("Running preflight checks...")
+		if errors := preflight.RunAll(cfg); len(errors) > 0 {
+			fmt.Println("Preflight checks failed:")
+			for _, err := range errors {
+				fmt.Printf("  ✗ %v\n", err)
+			}
+			return fmt.Errorf("preflight checks failed with %d error(s)", len(errors))
 		}
-		return fmt.Errorf("preflight checks failed with %d error(s)", len(errors))
+		fmt.Println("Preflight checks passed ✓")
+	} else {
+		fmt.Println("Skipping preflight checks (--skip-preflight)")
 	}
-	fmt.Println("Preflight checks passed ✓")
 
 	log.Printf("Loaded config from %s", configPath)
 	log.Printf("Backup base path: %s", cfg.BackupBasePath)
