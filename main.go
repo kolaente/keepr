@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"keepr/config"
+	"keepr/preflight"
 	"keepr/runner"
 	"keepr/scheduler"
 	"keepr/state"
@@ -68,6 +69,17 @@ func runServe(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+
+	// Run preflight checks
+	fmt.Println("Running preflight checks...")
+	if errors := preflight.RunAll(cfg); len(errors) > 0 {
+		fmt.Println("Preflight checks failed:")
+		for _, err := range errors {
+			fmt.Printf("  ✗ %v\n", err)
+		}
+		return fmt.Errorf("preflight checks failed with %d error(s)", len(errors))
+	}
+	fmt.Println("Preflight checks passed ✓")
 
 	log.Printf("Loaded config from %s", configPath)
 	log.Printf("Backup base path: %s", cfg.BackupBasePath)
