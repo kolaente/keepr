@@ -32,20 +32,3 @@ func RunAll(cfg *config.Config) []error {
 
 	return errors
 }
-
-// Placeholder check functions - will be implemented in checks.go
-func checkRsyncBinary(cfg *config.Config) []error {
-	return nil
-}
-
-func checkBackupBasePath(cfg *config.Config) []error {
-	return nil
-}
-
-func checkSSHKeys(cfg *config.Config) []error {
-	return nil
-}
-
-func checkCronSchedules(cfg *config.Config) []error {
-	return nil
-}
