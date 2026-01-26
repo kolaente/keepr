@@ -24,6 +24,9 @@
             --hover-bg: rgba(0, 0, 0, 0.03);
             --link-color: #3498db;
             --log-font-color: #1a1a1a;
+            --copy-btn-bg: #e8e8e8;
+            --copy-btn-hover: #d0d0d0;
+            --copy-btn-success: #27ae60;
         }
         [data-theme="dark"] {
             --bg-primary: #1a1a2e;
@@ -36,6 +39,9 @@
             --hover-bg: rgba(255, 255, 255, 0.05);
             --link-color: #5dade2;
             --log-font-color: #eeeeee;
+            --copy-btn-bg: #2a2a4a;
+            --copy-btn-hover: #3a3a5a;
+            --copy-btn-success: #27ae60;
         }
         * {
             margin: 0;
@@ -134,6 +140,29 @@
         .theme-icon {
             font-size: 14px;
         }
+        .copy-btn {
+            background: var(--copy-btn-bg);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .copy-btn:hover {
+            background: var(--copy-btn-hover);
+        }
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+        .copy-btn.copied {
+            background: var(--copy-btn-success);
+            color: white;
+        }
 
         .connection-status {
             font-size: 12px;
@@ -180,6 +209,10 @@
             <label for="theme-switch"></label>
             <span class="theme-icon">🌙</span>
         </div>
+        <button id="copy-btn" class="copy-btn" title="Copy logs to clipboard">
+            <span id="copy-icon">📋</span>
+            <span id="copy-text">Copy</span>
+        </button>
         <span id="connection-status" class="connection-status">Connecting...</span>
     </div>
 
@@ -228,6 +261,34 @@
             };
         }
 
+        // Copy logs to clipboard
+        function copyLogs() {
+            const copyBtn = document.getElementById('copy-btn');
+            const copyIcon = document.getElementById('copy-icon');
+            const copyText = document.getElementById('copy-text');
+
+            const logLines = logContainer.querySelectorAll('.log-line');
+            const text = Array.from(logLines).map(line => line.textContent).join('\n');
+
+            navigator.clipboard.writeText(text).then(function() {
+                copyBtn.classList.add('copied');
+                copyIcon.textContent = '✓';
+                copyText.textContent = 'Copied!';
+
+                setTimeout(function() {
+                    copyBtn.classList.remove('copied');
+                    copyIcon.textContent = '📋';
+                    copyText.textContent = 'Copy';
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Failed to copy logs:', err);
+                copyText.textContent = 'Failed';
+                setTimeout(function() {
+                    copyText.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+
         // Theme toggle
         (function() {
             var themeSwitch = document.getElementById('theme-switch');
@@ -265,6 +326,9 @@
 
         // Connect to SSE stream
         connect();
+
+        // Copy button click handler
+        document.getElementById('copy-btn').addEventListener('click', copyLogs);
     </script>
 </body>
 </html>
