@@ -25,7 +25,7 @@ func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []
 		args = append(args, "-e", sshCmd)
 		args = append(args, "--delete")
 		if server.RsyncPath != "" {
-			args = append(args, "--rsync-path='"+server.RsyncPath+"'")
+			args = append(args, "--rsync-path="+server.RsyncPath)
 		}
 	}
 
