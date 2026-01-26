@@ -139,3 +139,57 @@ func TestCheckRsyncError_OtherExitCodesAreErrors(t *testing.T) {
 		t.Error("Exit code 1 should be an error")
 	}
 }
+
+func TestBuildRsyncArgs_RelativeBackupDirExcluded(t *testing.T) {
+	// When backup_dir is relative, it should be excluded to prevent recursive backup loops
+	server := config.Server{
+		Name: "remote-server",
+		Type: "remote",
+		Host: "example.com",
+		Port: 22,
+		User: "backup",
+	}
+	path := config.Path{
+		Remote:    "/var/data",
+		Local:     "/backups/server/data",
+		BackupDir: "data_old", // Relative path
+	}
+
+	args := BuildRsyncArgs(server, path, path.Local)
+
+	// Check for exclude flag for relative backup_dir
+	hasExclude := false
+	for _, arg := range args {
+		if arg == "--exclude=**/data_old" {
+			hasExclude = true
+		}
+	}
+	if !hasExclude {
+		t.Errorf("Expected --exclude=**/data_old flag for relative backup_dir, got args: %v", args)
+	}
+}
+
+func TestBuildRsyncArgs_AbsoluteBackupDirNotExcluded(t *testing.T) {
+	// When backup_dir is absolute, no exclude is needed
+	server := config.Server{
+		Name: "remote-server",
+		Type: "remote",
+		Host: "example.com",
+		Port: 22,
+		User: "backup",
+	}
+	path := config.Path{
+		Remote:    "/var/data",
+		Local:     "/backups/server/data",
+		BackupDir: "/backups/server/data_old", // Absolute path
+	}
+
+	args := BuildRsyncArgs(server, path, path.Local)
+
+	// Check that no exclude flag is added for absolute backup_dir
+	for _, arg := range args {
+		if arg == "--exclude=**/data_old" {
+			t.Error("Should not add exclude for absolute backup_dir")
+		}
+	}
+}

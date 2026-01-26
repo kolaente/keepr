@@ -32,6 +32,13 @@ func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []
 	// Handle backup directory option
 	if path.BackupDir != "" {
 		args = append(args, "-b", "--backup-dir="+path.BackupDir)
+		// Exclude backup directory from sync to prevent recursive backup loops
+		// When backup_dir is relative, it's inside the destination and would get
+		// backed up into itself on subsequent runs (e.g., data_old/data_old/data_old/...)
+		// Use **/ prefix to match at any depth in case nesting already occurred
+		if !filepath.IsAbs(path.BackupDir) {
+			args = append(args, "--exclude=**/"+filepath.Base(path.BackupDir))
+		}
 	}
 
 	// Build source path
