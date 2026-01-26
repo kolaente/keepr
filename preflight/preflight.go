@@ -32,3 +32,14 @@ func RunAll(cfg *config.Config) []error {
 
 	return errors
 }
+
+// RunAllWithConnectivity runs all checks including SSH connectivity
+func RunAllWithConnectivity(cfg *config.Config) []error {
+	errors := RunAll(cfg)
+
+	if errs := checkSSHConnectivity(cfg); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
+
+	return errors
+}

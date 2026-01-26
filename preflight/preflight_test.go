@@ -9,8 +9,14 @@ import (
 )
 
 func TestRunAll_EmptyConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "preflight-runall-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	cfg := &config.Config{
-		BackupBasePath: "/tmp/test-backups",
+		BackupBasePath: tmpDir,
 		Servers:        []config.Server{},
 	}
 
@@ -308,5 +314,57 @@ func TestCheckCronSchedules_Empty(t *testing.T) {
 
 	if len(errors) != 0 {
 		t.Errorf("Expected no errors for empty schedule (manual-only), got: %v", errors)
+	}
+}
+
+func TestCheckSSHConnectivity_LocalServer(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{Name: "local", Type: "local"},
+		},
+	}
+
+	errors := checkSSHConnectivity(cfg)
+
+	if len(errors) != 0 {
+		t.Errorf("Expected no errors for local servers, got: %v", errors)
+	}
+}
+
+func TestCheckSSHConnectivity_InvalidHost(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{
+				Name: "remote",
+				Type: "remote",
+				Host: "invalid.host.that.does.not.exist.example.com",
+				Port: 22,
+			},
+		},
+	}
+
+	errors := checkSSHConnectivity(cfg)
+
+	if len(errors) != 1 {
+		t.Errorf("Expected 1 error for invalid host, got %d: %v", len(errors), errors)
+	}
+}
+
+func TestCheckSSHConnectivity_ConnectionRefused(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{
+				Name: "remote",
+				Type: "remote",
+				Host: "127.0.0.1",
+				Port: 65534, // Unlikely to have SSH here
+			},
+		},
+	}
+
+	errors := checkSSHConnectivity(cfg)
+
+	if len(errors) != 1 {
+		t.Errorf("Expected 1 error for refused connection, got %d: %v", len(errors), errors)
 	}
 }

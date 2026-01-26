@@ -2,9 +2,11 @@ package preflight
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/robfig/cron/v3"
 
@@ -123,6 +125,36 @@ func checkCronSchedules(cfg *config.Config) []error {
 				server.Name, server.Schedule, err,
 			))
 		}
+	}
+
+	return errors
+}
+
+// checkSSHConnectivity verifies TCP connectivity to remote SSH servers
+// This is a lightweight check - it only verifies the port is open, not authentication
+func checkSSHConnectivity(cfg *config.Config) []error {
+	var errors []error
+
+	for _, server := range cfg.Servers {
+		if server.Type != "remote" {
+			continue
+		}
+
+		port := server.Port
+		if port == 0 {
+			port = 22
+		}
+
+		addr := net.JoinHostPort(server.Host, fmt.Sprintf("%d", port))
+		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+		if err != nil {
+			errors = append(errors, fmt.Errorf(
+				"server %q: cannot connect to %s: %w",
+				server.Name, addr, err,
+			))
+			continue
+		}
+		conn.Close()
 	}
 
 	return errors
