@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keepr - Dashboard</title>
     <script>
-        (function() {
-            var theme = localStorage.getItem('keepr-theme');
+        (() => {
+            const theme = localStorage.getItem('keepr-theme');
             if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.setAttribute('data-theme', 'dark');
             }
@@ -244,16 +244,16 @@
     </div>
 
     <script>
-        (function() {
-            var themeSwitch = document.getElementById('theme-switch');
-            var storedTheme = localStorage.getItem('keepr-theme');
-            var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            var isDark = storedTheme === 'dark' || (!storedTheme && systemDark);
+        (() => {
+            const themeSwitch = document.getElementById('theme-switch');
+            const storedTheme = localStorage.getItem('keepr-theme');
+            const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = storedTheme === 'dark' || (!storedTheme && systemDark);
 
             themeSwitch.checked = isDark;
 
-            themeSwitch.addEventListener('change', function() {
-                if (this.checked) {
+            themeSwitch.addEventListener('change', () => {
+                if (themeSwitch.checked) {
                     document.documentElement.setAttribute('data-theme', 'dark');
                     localStorage.setItem('keepr-theme', 'dark');
                 } else {
@@ -262,7 +262,7 @@
                 }
             });
 
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
                 if (!localStorage.getItem('keepr-theme')) {
                     if (e.matches) {
                         document.documentElement.setAttribute('data-theme', 'dark');
@@ -274,60 +274,50 @@
                 }
             });
 
-            // AJAX polling for dashboard updates
-            function updateDashboard() {
-                fetch('/api/dashboard')
-                    .then(function(response) {
-                        if (!response.ok) throw new Error('Network error');
-                        return response.json();
-                    })
-                    .then(function(data) {
-                        updateTable(data.servers);
-                        updateCards(data.servers);
-                    })
-                    .catch(function(err) {
-                        console.error('Dashboard update failed:', err);
-                    });
-            }
+            const updateDashboard = async () => {
+                try {
+                    const response = await fetch('/api/dashboard');
+                    if (!response.ok) throw new Error('Network error');
+                    const data = await response.json();
+                    updateTable(data.servers);
+                    updateCards(data.servers);
+                } catch (err) {
+                    console.error('Dashboard update failed:', err);
+                }
+            };
 
-            function updateTable(servers) {
-                var tbody = document.querySelector('.server-table tbody');
+            const updateTable = (servers) => {
+                const tbody = document.querySelector('.server-table tbody');
                 if (!tbody) return;
 
-                servers.forEach(function(server, index) {
-                    var row = tbody.children[index];
+                servers.forEach((server, index) => {
+                    const row = tbody.children[index];
                     if (!row) return;
 
-                    var cells = row.querySelectorAll('td');
-                    // Update status (cell 1)
-                    cells[1].innerHTML = '<span class="status-dot status-' + server.status + '"></span>' + server.status;
-                    // Update last run (cell 2)
+                    const cells = row.querySelectorAll('td');
+                    cells[1].innerHTML = `<span class="status-dot status-${server.status}"></span>${server.status}`;
                     cells[2].textContent = server.last_run;
-                    // Update next run (cell 3)
                     cells[3].textContent = server.next_run;
                 });
-            }
+            };
 
-            function updateCards(servers) {
-                var cards = document.querySelectorAll('.server-card');
+            const updateCards = (servers) => {
+                const cards = document.querySelectorAll('.server-card');
 
-                servers.forEach(function(server, index) {
-                    var card = cards[index];
+                servers.forEach((server, index) => {
+                    const card = cards[index];
                     if (!card) return;
 
-                    // Update status dot
-                    var statusDot = card.querySelector('.status-dot');
-                    statusDot.className = 'status-dot status-' + server.status;
+                    const statusDot = card.querySelector('.status-dot');
+                    statusDot.className = `status-dot status-${server.status}`;
 
-                    // Update info spans
-                    var infoSpans = card.querySelectorAll('.info span:not(.label)');
+                    const infoSpans = card.querySelectorAll('.info span:not(.label)');
                     infoSpans[0].textContent = server.status;
                     infoSpans[1].textContent = server.last_run;
                     infoSpans[2].textContent = server.next_run;
                 });
-            }
+            };
 
-            // Poll every 5 seconds
             setInterval(updateDashboard, 5000);
         })();
     </script>
