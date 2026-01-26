@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"keepr/config"
 )
@@ -60,6 +61,10 @@ func RunRsync(ctx context.Context, server config.Server, path config.Path, baseP
 	}
 
 	cmd := exec.CommandContext(ctx, "rsync", args...)
+
+	if logFn != nil {
+		logFn(fmt.Sprintf("Running: rsync %s", strings.Join(args, " ")))
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
