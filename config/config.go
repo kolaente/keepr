@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -108,6 +109,9 @@ func (c *Config) ApplyDefaults() {
 func (c *Config) Validate() error {
 	if c.BackupBasePath == "" {
 		return errors.New("backup_base_path is required")
+	}
+	if !filepath.IsAbs(c.BackupBasePath) {
+		return errors.New("backup_base_path must be an absolute path")
 	}
 
 	// Check for duplicate server names

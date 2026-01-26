@@ -116,6 +116,18 @@ servers:
 			wantErr: true,
 		},
 		{
+			name: "relative backup_base_path",
+			yaml: `
+backup_base_path: backups
+servers:
+  - name: server1
+    host: example.com
+    paths:
+      - remote: /data
+`,
+			wantErr: true,
+		},
+		{
 			name: "duplicate server names",
 			yaml: `
 backup_base_path: /backups
