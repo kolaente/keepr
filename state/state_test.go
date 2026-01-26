@@ -1,6 +1,7 @@
 package state
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,13 +79,13 @@ func TestLogBuffer(t *testing.T) {
 	mgr.AppendLog("server1", "line 2")
 	mgr.AppendLog("server1", "line 3")
 
-	// GetLogs returns all lines in order
+	// GetLogs returns all lines in order (with timestamps)
 	logs := mgr.GetLogs("server1")
 	if len(logs) != 3 {
 		t.Fatalf("len(logs) = %d, want 3", len(logs))
 	}
-	if logs[0] != "line 1" || logs[1] != "line 2" || logs[2] != "line 3" {
-		t.Errorf("logs = %v, want [line 1, line 2, line 3]", logs)
+	if !strings.Contains(logs[0], "line 1") || !strings.Contains(logs[1], "line 2") || !strings.Contains(logs[2], "line 3") {
+		t.Errorf("logs = %v, want lines containing [line 1, line 2, line 3]", logs)
 	}
 
 	// ClearLogs removes all lines
@@ -110,8 +111,8 @@ func TestLogBufferMaxSize(t *testing.T) {
 	if len(logs) != 3 {
 		t.Fatalf("len(logs) = %d, want 3", len(logs))
 	}
-	// Should have lines 3, 4, 5 (oldest dropped)
-	if logs[0] != "line 3" || logs[1] != "line 4" || logs[2] != "line 5" {
-		t.Errorf("logs = %v, want [line 3, line 4, line 5]", logs)
+	// Should have lines 3, 4, 5 (oldest dropped, with timestamps)
+	if !strings.Contains(logs[0], "line 3") || !strings.Contains(logs[1], "line 4") || !strings.Contains(logs[2], "line 5") {
+		t.Errorf("logs = %v, want lines containing [line 3, line 4, line 5]", logs)
 	}
 }

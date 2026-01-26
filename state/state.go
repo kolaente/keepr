@@ -109,7 +109,8 @@ func (m *Manager) AppendLog(name, line string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.logs[name] = append(m.logs[name], line)
+	timestamp := time.Now().Format("15:04:05")
+	m.logs[name] = append(m.logs[name], "["+timestamp+"] "+line)
 
 	// Ring buffer: drop oldest if exceeding size
 	if len(m.logs[name]) > m.logSize {
