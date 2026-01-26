@@ -163,6 +163,29 @@
             background: var(--copy-btn-success);
             color: white;
         }
+        .follow-btn {
+            background: var(--copy-btn-bg);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .follow-btn:hover {
+            background: var(--copy-btn-hover);
+        }
+        .follow-btn:active {
+            transform: scale(0.95);
+        }
+        .follow-btn.active {
+            background: var(--link-color);
+            color: white;
+        }
 
         .connection-status {
             font-size: 12px;
@@ -213,6 +236,10 @@
             <span id="copy-icon">📋</span>
             <span id="copy-text">Copy</span>
         </button>
+        <button id="follow-btn" class="follow-btn active" title="Auto-scroll to new logs">
+            <span id="follow-icon">↓</span>
+            <span id="follow-text">Follow</span>
+        </button>
         <span id="connection-status" class="connection-status">Connecting...</span>
     </div>
 
@@ -225,10 +252,27 @@
     <script>
         const logContainer = document.getElementById('log-container');
         const connectionStatus = document.getElementById('connection-status');
+        const followBtn = document.getElementById('follow-btn');
         let eventSource = null;
+        let following = true;
 
         function scrollToBottom() {
-            logContainer.scrollTop = logContainer.scrollHeight;
+            if (following) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        function updateFollowButton() {
+            if (following) {
+                followBtn.classList.add('active');
+            } else {
+                followBtn.classList.remove('active');
+            }
+        }
+
+        function isNearBottom() {
+            const threshold = 50;
+            return logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < threshold;
         }
 
         function appendLog(line) {
@@ -238,6 +282,30 @@
             logContainer.appendChild(div);
             scrollToBottom();
         }
+
+        // Detect manual scroll and disable following if user scrolls up
+        logContainer.addEventListener('scroll', function() {
+            if (isNearBottom()) {
+                if (!following) {
+                    following = true;
+                    updateFollowButton();
+                }
+            } else {
+                if (following) {
+                    following = false;
+                    updateFollowButton();
+                }
+            }
+        });
+
+        // Toggle follow on button click
+        followBtn.addEventListener('click', function() {
+            following = !following;
+            updateFollowButton();
+            if (following) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        });
 
         function connect() {
             // Count existing log lines to avoid duplicates
