@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keepr - Dashboard</title>
-    <meta http-equiv="refresh" content="5">
     <script>
         (function() {
             var theme = localStorage.getItem('keepr-theme');
@@ -274,6 +273,62 @@
                     }
                 }
             });
+
+            // AJAX polling for dashboard updates
+            function updateDashboard() {
+                fetch('/api/dashboard')
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Network error');
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        updateTable(data.servers);
+                        updateCards(data.servers);
+                    })
+                    .catch(function(err) {
+                        console.error('Dashboard update failed:', err);
+                    });
+            }
+
+            function updateTable(servers) {
+                var tbody = document.querySelector('.server-table tbody');
+                if (!tbody) return;
+
+                servers.forEach(function(server, index) {
+                    var row = tbody.children[index];
+                    if (!row) return;
+
+                    var cells = row.querySelectorAll('td');
+                    // Update status (cell 1)
+                    cells[1].innerHTML = '<span class="status-dot status-' + server.status + '"></span>' + server.status;
+                    // Update last run (cell 2)
+                    cells[2].textContent = server.last_run;
+                    // Update next run (cell 3)
+                    cells[3].textContent = server.next_run;
+                });
+            }
+
+            function updateCards(servers) {
+                var cards = document.querySelectorAll('.server-card');
+
+                servers.forEach(function(server, index) {
+                    var card = cards[index];
+                    if (!card) return;
+
+                    // Update status dot
+                    var statusDot = card.querySelector('.status-dot');
+                    statusDot.className = 'status-dot status-' + server.status;
+
+                    // Update info spans
+                    var infoSpans = card.querySelectorAll('.info span:not(.label)');
+                    infoSpans[0].textContent = server.status;
+                    infoSpans[1].textContent = server.last_run;
+                    infoSpans[2].textContent = server.next_run;
+                });
+            }
+
+            // Poll every 5 seconds
+            setInterval(updateDashboard, 5000);
         })();
     </script>
 </body>
