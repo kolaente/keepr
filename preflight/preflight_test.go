@@ -88,3 +88,54 @@ func TestCheckRsyncBinary_NotFound(t *testing.T) {
 		t.Errorf("Error should mention rsync: %v", errors[0])
 	}
 }
+
+func TestCheckBackupBasePath_Exists(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "preflight-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cfg := &config.Config{
+		BackupBasePath: tmpDir,
+	}
+
+	errors := checkBackupBasePath(cfg)
+
+	if len(errors) != 0 {
+		t.Errorf("Expected no errors for existing writable path, got: %v", errors)
+	}
+}
+
+func TestCheckBackupBasePath_NotExists(t *testing.T) {
+	cfg := &config.Config{
+		BackupBasePath: "/nonexistent/path/that/does/not/exist",
+	}
+
+	errors := checkBackupBasePath(cfg)
+
+	if len(errors) != 1 {
+		t.Errorf("Expected 1 error, got %d: %v", len(errors), errors)
+	}
+
+	if len(errors) > 0 && !strings.Contains(errors[0].Error(), "does not exist") {
+		t.Errorf("Error should mention path does not exist: %v", errors[0])
+	}
+}
+
+func TestCheckBackupBasePath_NotWritable(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("Cannot test non-writable paths as root")
+	}
+
+	cfg := &config.Config{
+		BackupBasePath: "/root", // Usually not writable by non-root
+	}
+
+	errors := checkBackupBasePath(cfg)
+
+	// Should either not exist or not be writable
+	if len(errors) == 0 {
+		t.Error("Expected error for non-writable path")
+	}
+}
