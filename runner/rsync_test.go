@@ -18,7 +18,7 @@ func TestBuildRsyncArgs_Local(t *testing.T) {
 		Local:  "/backups/data",
 	}
 
-	args := BuildRsyncArgs(server, path)
+	args := BuildRsyncArgs(server, path, path.Local)
 
 	// Should have basic flags
 	hasAVZ := false
@@ -61,7 +61,7 @@ func TestBuildRsyncArgs_Remote(t *testing.T) {
 		BackupDir: "/backups/server/data.old",
 	}
 
-	args := BuildRsyncArgs(server, path)
+	args := BuildRsyncArgs(server, path, path.Local)
 
 	// Check for SSH option
 	hasSSH := false

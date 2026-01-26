@@ -11,7 +11,8 @@ import (
 )
 
 // BuildRsyncArgs builds the rsync command arguments for a given server and path.
-func BuildRsyncArgs(server config.Server, path config.Path) []string {
+// The localPath parameter should be the resolved absolute path for the destination.
+func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []string {
 	args := []string{"-avz"}
 
 	// For remote servers, add SSH options
@@ -37,17 +38,23 @@ func BuildRsyncArgs(server config.Server, path config.Path) []string {
 		source = path.Remote
 	}
 
-	args = append(args, source, path.Local)
+	args = append(args, source, localPath)
 
 	return args
 }
 
 // RunRsync executes rsync for a server/path pair and streams output to logFn
 func RunRsync(ctx context.Context, server config.Server, path config.Path, basePath string, logFn LogFunc) error {
-	args := BuildRsyncArgs(server, path)
+	// Resolve local path: if not absolute, join with basePath
+	localPath := path.Local
+	if !filepath.IsAbs(localPath) {
+		localPath = filepath.Join(basePath, localPath)
+	}
+
+	args := BuildRsyncArgs(server, path, localPath)
 
 	// Ensure destination directory exists
-	destDir := filepath.Dir(path.Local)
+	destDir := filepath.Dir(localPath)
 	if err := exec.CommandContext(ctx, "mkdir", "-p", destDir).Run(); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
