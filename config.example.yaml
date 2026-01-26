@@ -16,6 +16,8 @@ defaults:
   user: backup
   # SSH port for remote connections
   port: 22
+  # Command to run rsync on remote server (e.g., "sudo rsync" for root access)
+  rsync_path: "sudo rsync"
   # Number of days to keep old backup versions
   retention_days: 7
   # Cron schedule for backups (daily at 2am)

@@ -29,6 +29,7 @@ type Server struct {
 	Port          int    `yaml:"port"`
 	User          string `yaml:"user"`
 	Key           string `yaml:"key"`
+	RsyncPath     string `yaml:"rsync_path"`
 	Schedule      string `yaml:"schedule"`
 	Heartbeat     string `yaml:"heartbeat"`
 	PreHook       string `yaml:"pre_hook"`
@@ -90,6 +91,9 @@ func (c *Config) ApplyDefaults() {
 		}
 		if s.Key == "" {
 			s.Key = c.Defaults.Key
+		}
+		if s.RsyncPath == "" {
+			s.RsyncPath = c.Defaults.RsyncPath
 		}
 		if s.Schedule == "" {
 			s.Schedule = c.Defaults.Schedule
