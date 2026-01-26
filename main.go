@@ -23,6 +23,7 @@ import (
 var configPath string
 var runAll bool
 var skipPreflight bool
+var checkConnectivity bool
 
 var rootCmd = &cobra.Command{
 	Use:   "keepr",
@@ -49,13 +50,22 @@ var statusCmd = &cobra.Command{
 	RunE:  showStatus,
 }
 
+var preflightCmd = &cobra.Command{
+	Use:   "preflight",
+	Short: "Run preflight checks on configuration",
+	Long:  "Validates configuration, checks permissions, SSH keys, and optionally tests connectivity",
+	RunE:  runPreflight,
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/etc/keepr/config.yaml", "config file path")
 	runCmd.Flags().BoolVarP(&runAll, "all", "a", false, "run backup for all servers")
 	serveCmd.Flags().BoolVar(&skipPreflight, "skip-preflight", false, "Skip preflight checks (not recommended)")
+	preflightCmd.Flags().BoolVar(&checkConnectivity, "check-connectivity", false, "Also check SSH connectivity to remote servers")
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(preflightCmd)
 }
 
 func main() {
@@ -270,5 +280,40 @@ func showStatus(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%-20s %-10s %s\n", server.Name, serverType, schedule)
 	}
 
+	return nil
+}
+
+func runPreflight(cmd *cobra.Command, args []string) error {
+	cfg, err := config.LoadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	fmt.Println("Running preflight checks...")
+	fmt.Println()
+
+	var errors []error
+	if checkConnectivity {
+		errors = preflight.RunAllWithConnectivity(cfg)
+	} else {
+		errors = preflight.RunAll(cfg)
+	}
+
+	if len(errors) > 0 {
+		fmt.Println("✗ Preflight checks failed:")
+		fmt.Println()
+		for _, err := range errors {
+			fmt.Printf("  • %v\n", err)
+		}
+		fmt.Println()
+		fmt.Printf("Total: %d error(s)\n", len(errors))
+		return fmt.Errorf("preflight failed")
+	}
+
+	fmt.Println("✓ All preflight checks passed")
+	if !checkConnectivity {
+		fmt.Println()
+		fmt.Println("Tip: Run with --check-connectivity to also verify SSH connections")
+	}
 	return nil
 }
