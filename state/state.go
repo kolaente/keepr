@@ -82,6 +82,21 @@ func (m *Manager) SetRunning(name string) {
 	s.StartedAt = time.Now()
 }
 
+// TrySetRunning atomically checks if the server is already running.
+// If not running, it sets the status to running and returns true.
+// If already running, it returns false without modifying state.
+func (m *Manager) TrySetRunning(name string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := m.get(name)
+	if s.Status == StatusRunning {
+		return false
+	}
+	s.Status = StatusRunning
+	s.StartedAt = time.Now()
+	return true
+}
+
 func (m *Manager) SetSuccess(name string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -33,14 +33,19 @@ func (r *Runner) Run(server config.Server) error {
 	ctx := context.Background()
 	name := server.Name
 
+	// Try to acquire running state atomically
+	if !r.state.TrySetRunning(name) {
+		return fmt.Errorf("backup already running for %s", name)
+	}
+
+	// Clear logs after acquiring lock to avoid clearing logs from the running backup
+	r.state.ClearLogs(name)
+
 	// Create log function
 	logFn := func(line string) {
 		r.state.AppendLog(name, line)
 	}
 
-	// Clear logs and set running state
-	r.state.ClearLogs(name)
-	r.state.SetRunning(name)
 	logFn(fmt.Sprintf("Starting backup for %s", name))
 
 	// Run pre-hook

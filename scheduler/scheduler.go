@@ -34,13 +34,22 @@ func (s *Scheduler) Add(server config.Server, runFn RunFunc) error {
 		return nil
 	}
 
+	// Remove any existing entry for this server to prevent duplicates
+	s.mu.Lock()
+	if existingID, ok := s.entries[server.Name]; ok {
+		s.cron.Remove(existingID)
+		delete(s.entries, server.Name)
+	}
+	s.mu.Unlock()
+
 	srv := server // capture for closure
 
 	entryID, err := s.cron.AddFunc(server.Schedule, func() {
+		s.mu.Lock()
 		if s.running[srv.Name] {
+			s.mu.Unlock()
 			return
 		}
-		s.mu.Lock()
 		s.running[srv.Name] = true
 		s.mu.Unlock()
 
