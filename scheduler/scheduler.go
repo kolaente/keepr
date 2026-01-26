@@ -37,12 +37,10 @@ func (s *Scheduler) Add(server config.Server, runFn RunFunc) error {
 	srv := server // capture for closure
 
 	entryID, err := s.cron.AddFunc(server.Schedule, func() {
-		// Skip if already running
-		s.mu.Lock()
 		if s.running[srv.Name] {
-			s.mu.Unlock()
 			return
 		}
+		s.mu.Lock()
 		s.running[srv.Name] = true
 		s.mu.Unlock()
 
