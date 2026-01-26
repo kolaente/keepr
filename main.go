@@ -35,10 +35,11 @@ var serveCmd = &cobra.Command{
 }
 
 var runCmd = &cobra.Command{
-	Use:   "run [server-name]",
-	Short: "Run backup manually",
-	Long:  "Run backup for a specific server or all servers",
-	RunE:  runBackup,
+	Use:          "run [server-name]",
+	Short:        "Run backup manually",
+	Long:         "Run backup for a specific server or all servers",
+	SilenceUsage: true,
+	RunE:         runBackup,
 }
 
 var statusCmd = &cobra.Command{
