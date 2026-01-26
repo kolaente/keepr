@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -193,12 +192,10 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	// Trigger backups
 	var failed []string
 	for _, name := range serverNames {
-		fmt.Printf("Running backup for %s...\n", name)
-
 		// Trigger backup via API
 		req, err := http.NewRequest(http.MethodPost, baseURL+"/api/run/"+name, nil)
 		if err != nil {
-			fmt.Printf("  ✗ Failed: %v\n", err)
+			fmt.Printf("  ✗ %s: %v\n", name, err)
 			failed = append(failed, name)
 			continue
 		}
@@ -206,7 +203,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("  ✗ Failed to connect to server: %v\n", err)
+			fmt.Printf("  ✗ %s: failed to connect to server: %v\n", name, err)
 			fmt.Println("    Is the keepr server running? (keepr serve)")
 			failed = append(failed, name)
 			continue
@@ -215,75 +212,20 @@ func runBackup(cmd *cobra.Command, args []string) error {
 		if resp.StatusCode != http.StatusAccepted {
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
-			fmt.Printf("  ✗ Failed: %s\n", string(body))
+			fmt.Printf("  ✗ %s: %s\n", name, string(body))
 			failed = append(failed, name)
 			continue
 		}
 		_ = resp.Body.Close()
 
-		// Poll for completion
-		if err := waitForCompletion(client, baseURL, cfg.Web.APISecret, name); err != nil {
-			fmt.Printf("  ✗ Failed: %v\n", err)
-			failed = append(failed, name)
-		} else {
-			fmt.Printf("  ✓ Completed\n")
-		}
+		fmt.Printf("  ✓ %s: scheduled\n", name)
 	}
 
-	// Print summary
-	fmt.Println()
 	if len(failed) > 0 {
-		fmt.Printf("Failed: %d/%d servers\n", len(failed), len(serverNames))
-		for _, name := range failed {
-			fmt.Printf("  - %s\n", name)
-		}
-		return fmt.Errorf("some backups failed")
+		return fmt.Errorf("failed to schedule: %v", failed)
 	}
 
-	fmt.Printf("Success: %d/%d servers\n", len(serverNames), len(serverNames))
 	return nil
-}
-
-func waitForCompletion(client *http.Client, baseURL, secret, name string) error {
-	pollInterval := 2 * time.Second
-	timeout := 2 * time.Hour
-	deadline := time.Now().Add(timeout)
-
-	for time.Now().Before(deadline) {
-		req, err := http.NewRequest(http.MethodGet, baseURL+"/api/status/"+name, nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+secret)
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-
-		var status struct {
-			Status string `json:"status"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-			_ = resp.Body.Close()
-			return err
-		}
-		_ = resp.Body.Close()
-
-		switch status.Status {
-		case "success":
-			return nil
-		case "failed_backup", "failed_pre_hook", "failed_post_hook":
-			return fmt.Errorf("backup %s", status.Status)
-		case "running":
-			time.Sleep(pollInterval)
-		default:
-			// idle or unknown, keep polling briefly in case it hasn't started yet
-			time.Sleep(pollInterval)
-		}
-	}
-
-	return fmt.Errorf("timeout waiting for backup to complete")
 }
 
 func showStatus(cmd *cobra.Command, args []string) error {
