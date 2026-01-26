@@ -64,6 +64,7 @@ func New(sm *state.Manager, cfg *config.Config, runner BackupRunner) *Server {
 	s.mux.HandleFunc("/api/logs/", s.handleLogsAPI)
 	s.mux.HandleFunc("/api/run/", s.handleRunAPI)
 	s.mux.HandleFunc("/api/status/", s.handleStatusAPI)
+	s.mux.HandleFunc("/api/dashboard", s.handleDashboardAPI)
 
 	return s
 }
@@ -93,6 +94,36 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if err := s.templates.ExecuteTemplate(w, "dashboard.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (s *Server) handleDashboardAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	servers := s.state.All()
+	views := make([]map[string]interface{}, len(servers))
+	for i, srv := range servers {
+		views[i] = map[string]interface{}{
+			"name":     srv.Name,
+			"status":   string(srv.Status),
+			"last_run": formatTime(srv.LastRun),
+			"next_run": formatTime(srv.NextRun),
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"servers": views,
+	})
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format("2006-01-02 15:04:05")
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
