@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/robfig/cron/v3"
+
 	"keepr/config"
 )
 
@@ -104,6 +106,24 @@ func checkSSHKeys(cfg *config.Config) []error {
 
 // checkCronSchedules validates all server cron schedules
 func checkCronSchedules(cfg *config.Config) []error {
-	// Placeholder - will be implemented in keeper-6wz.5
-	return nil
+	var errors []error
+
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+
+	for _, server := range cfg.Servers {
+		if server.Schedule == "" {
+			// No schedule means manual-only, which is valid
+			continue
+		}
+
+		_, err := parser.Parse(server.Schedule)
+		if err != nil {
+			errors = append(errors, fmt.Errorf(
+				"server %q: invalid cron schedule %q: %w",
+				server.Name, server.Schedule, err,
+			))
+		}
+	}
+
+	return errors
 }

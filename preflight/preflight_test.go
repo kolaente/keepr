@@ -265,3 +265,48 @@ func TestCheckSSHKeys_NoKeyForRemote(t *testing.T) {
 		t.Errorf("No key specified should not be an error (might use ssh-agent), got: %v", errors)
 	}
 }
+
+func TestCheckCronSchedules_Valid(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{Name: "server1", Schedule: "0 2 * * *"},
+			{Name: "server2", Schedule: "*/15 * * * *"},
+			{Name: "server3", Schedule: "@daily"},
+		},
+	}
+
+	errors := checkCronSchedules(cfg)
+
+	if len(errors) != 0 {
+		t.Errorf("Expected no errors for valid schedules, got: %v", errors)
+	}
+}
+
+func TestCheckCronSchedules_Invalid(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{Name: "server1", Schedule: "invalid cron"},
+			{Name: "server2", Schedule: "* * *"}, // Too few fields
+		},
+	}
+
+	errors := checkCronSchedules(cfg)
+
+	if len(errors) != 2 {
+		t.Errorf("Expected 2 errors for invalid schedules, got %d: %v", len(errors), errors)
+	}
+}
+
+func TestCheckCronSchedules_Empty(t *testing.T) {
+	cfg := &config.Config{
+		Servers: []config.Server{
+			{Name: "server1", Schedule: ""}, // No schedule = manual only
+		},
+	}
+
+	errors := checkCronSchedules(cfg)
+
+	if len(errors) != 0 {
+		t.Errorf("Expected no errors for empty schedule (manual-only), got: %v", errors)
+	}
+}
