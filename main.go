@@ -86,7 +86,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 	for _, server := range cfg.Servers {
 		srv := server // capture for closure
 		err := sched.Add(srv, func(s config.Server) {
-			_ = r.Run(s)
+			log.Printf("Starting scheduled backup for %s", s.Name)
+			if err := r.Run(s); err != nil {
+				log.Printf("Backup failed for %s: %v", s.Name, err)
+			} else {
+				log.Printf("Backup completed for %s", s.Name)
+			}
 		})
 		if err != nil {
 			return fmt.Errorf("failed to schedule %s: %w", srv.Name, err)
