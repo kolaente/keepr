@@ -56,8 +56,8 @@ func checkBackupBasePath(cfg *config.Config) []error {
 			fmt.Errorf("backup_base_path %q is not writable: %w", path, err),
 		}
 	}
-	f.Close()
-	os.Remove(testFile)
+	_ = f.Close()
+	_ = os.Remove(testFile)
 
 	return nil
 }
@@ -154,7 +154,7 @@ func checkSSHConnectivity(cfg *config.Config) []error {
 			))
 			continue
 		}
-		conn.Close()
+		_ = conn.Close()
 	}
 
 	return errors

@@ -13,7 +13,7 @@ func TestRunAll_EmptyConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	cfg := &config.Config{
 		BackupBasePath: tmpDir,
@@ -78,10 +78,10 @@ func TestCheckRsyncBinary_Found(t *testing.T) {
 func TestCheckRsyncBinary_NotFound(t *testing.T) {
 	// Save and restore PATH
 	originalPath := os.Getenv("PATH")
-	defer os.Setenv("PATH", originalPath)
+	defer func() { _ = os.Setenv("PATH", originalPath) }()
 
 	// Set PATH to empty to simulate rsync not found
-	os.Setenv("PATH", "/nonexistent")
+	_ = os.Setenv("PATH", "/nonexistent")
 
 	cfg := &config.Config{}
 	errors := checkRsyncBinary(cfg)
@@ -100,7 +100,7 @@ func TestCheckBackupBasePath_Exists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	cfg := &config.Config{
 		BackupBasePath: tmpDir,
@@ -166,11 +166,11 @@ func TestCheckSSHKeys_KeyExists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
 
 	// Set correct permissions
-	os.Chmod(tmpFile.Name(), 0600)
+	_ = os.Chmod(tmpFile.Name(), 0600)
 
 	cfg := &config.Config{
 		Servers: []config.Server{
@@ -223,11 +223,11 @@ func TestCheckSSHKeys_KeyBadPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
 
 	// Set world-readable permissions (bad for SSH keys)
-	os.Chmod(tmpFile.Name(), 0644)
+	_ = os.Chmod(tmpFile.Name(), 0644)
 
 	cfg := &config.Config{
 		Servers: []config.Server{
