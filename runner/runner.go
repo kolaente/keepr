@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"os/user"
 	"time"
 
 	"keepr/config"
@@ -57,6 +59,14 @@ func (r *Runner) Run(server config.Server) error {
 			return err
 		}
 		logFn("Pre-hook completed successfully")
+	}
+
+	// Check permissions for local servers before starting
+	if server.Type == "local" {
+		if err := checkLocalPermissions(server, logFn); err != nil {
+			r.state.SetFailed(name, state.StatusFailedBackup)
+			return err
+		}
 	}
 
 	// Run rsync for each path
@@ -130,4 +140,54 @@ func (r *Runner) callHeartbeat(url string) error {
 		return fmt.Errorf("heartbeat returned status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// checkLocalPermissions verifies that all local paths are readable before starting backup
+func checkLocalPermissions(server config.Server, logFn LogFunc) error {
+	var unreadable []string
+
+	for _, path := range server.Paths {
+		// Check if path is readable by trying to read directory contents
+		// os.Open alone doesn't check read permissions for directory contents
+		f, err := os.Open(path.Remote)
+		if err != nil {
+			if os.IsPermission(err) {
+				unreadable = append(unreadable, path.Remote)
+			}
+			// Ignore other errors (like not exists) - rsync will handle those
+			continue
+		}
+
+		// For directories, try to read entries to verify read permission
+		info, err := f.Stat()
+		if err == nil && info.IsDir() {
+			_, err = f.Readdirnames(1)
+			if err != nil && os.IsPermission(err) {
+				unreadable = append(unreadable, path.Remote)
+			}
+		}
+		_ = f.Close()
+	}
+
+	if len(unreadable) == 0 {
+		return nil
+	}
+
+	// Get current username for ACL command
+	username := "youruser"
+	if u, err := user.Current(); err == nil {
+		username = u.Username
+	}
+
+	logFn("Permission denied for the following paths:")
+	for _, p := range unreadable {
+		logFn(fmt.Sprintf("  - %s", p))
+	}
+	logFn("")
+	logFn("To fix, grant read access with ACLs:")
+	for _, p := range unreadable {
+		logFn(fmt.Sprintf("  sudo setfacl -R -m u:%s:rX %s", username, p))
+	}
+
+	return fmt.Errorf("permission denied: %d path(s) not readable", len(unreadable))
 }
