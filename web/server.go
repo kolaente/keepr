@@ -166,12 +166,17 @@ func (s *Server) handleLogsAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering for SSE
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "SSE not supported", http.StatusInternalServerError)
 		return
 	}
+
+	// Send initial SSE comment to establish the connection
+	_, _ = fmt.Fprintf(w, ": connected\n\n")
+	flusher.Flush()
 
 	// Parse 'from' query parameter to skip already-rendered logs
 	lastCount := 0
