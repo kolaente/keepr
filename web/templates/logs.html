@@ -240,6 +240,10 @@
             <span id="follow-icon">↓</span>
             <span id="follow-text">Follow</span>
         </button>
+        <button id="bottom-btn" class="copy-btn" title="Scroll to bottom">
+            <span>⤓</span>
+            <span>Bottom</span>
+        </button>
         <span id="connection-status" class="connection-status">Connecting...</span>
     </div>
 
@@ -317,7 +321,20 @@
                 connectionStatus.className = 'connection-status connected';
             };
 
+            // Fallback: check readyState after a short delay since onopen doesn't always fire
+            setTimeout(function() {
+                if (eventSource && eventSource.readyState === EventSource.OPEN && connectionStatus.textContent === 'Connecting...') {
+                    connectionStatus.textContent = 'Connected';
+                    connectionStatus.className = 'connection-status connected';
+                }
+            }, 500);
+
             eventSource.onmessage = function(event) {
+                // Also update status here as fallback since onopen doesn't always fire
+                if (connectionStatus.textContent !== 'Connected') {
+                    connectionStatus.textContent = 'Connected';
+                    connectionStatus.className = 'connection-status connected';
+                }
                 appendLog(event.data);
             };
 
@@ -397,6 +414,11 @@
 
         // Copy button click handler
         document.getElementById('copy-btn').addEventListener('click', copyLogs);
+
+        // Scroll to bottom button click handler
+        document.getElementById('bottom-btn').addEventListener('click', function() {
+            logContainer.scrollTop = logContainer.scrollHeight;
+        });
     </script>
 </body>
 </html>
