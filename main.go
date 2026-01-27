@@ -26,8 +26,9 @@ var skipPreflight bool
 var checkConnectivity bool
 
 var rootCmd = &cobra.Command{
-	Use:   "keepr",
-	Short: "Keepr - A backup service with web UI",
+	Use:          "keepr",
+	Short:        "Keepr - A backup service with web UI",
+	SilenceUsage: true,
 }
 
 var serveCmd = &cobra.Command{
@@ -37,11 +38,10 @@ var serveCmd = &cobra.Command{
 }
 
 var runCmd = &cobra.Command{
-	Use:          "run [server-name]",
-	Short:        "Run backup manually",
-	Long:         "Run backup for a specific server or all servers",
-	SilenceUsage: true,
-	RunE:         runBackup,
+	Use:   "run [server-name]",
+	Short: "Run backup manually",
+	Long:  "Run backup for a specific server or all servers",
+	RunE:  runBackup,
 }
 
 var statusCmd = &cobra.Command{
