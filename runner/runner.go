@@ -91,13 +91,13 @@ func (r *Runner) Run(server config.Server) error {
 	// Run cleanup if retention is configured
 	if server.RetentionDays > 0 {
 		logFn(fmt.Sprintf("Running cleanup (retention: %d days)", server.RetentionDays))
-		deleted, err := Cleanup(r.config.BackupBasePath, name, server.RetentionDays)
+		deleted, err := Cleanup(r.config.BackupBasePath, server, server.RetentionDays)
 		if err != nil {
 			logFn(fmt.Sprintf("Cleanup warning: %v", err))
 		} else if deleted > 0 {
 			logFn(fmt.Sprintf("Cleaned up %d old files", deleted))
 		}
-		if err := CleanupEmptyDirs(r.config.BackupBasePath, name); err != nil {
+		if err := CleanupEmptyDirs(r.config.BackupBasePath, server); err != nil {
 			logFn(fmt.Sprintf("Cleanup empty dirs warning: %v", err))
 		}
 	}

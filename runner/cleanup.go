@@ -3,77 +3,96 @@ package runner
 import (
 	"os"
 	"path/filepath"
-	"strings"
+	"sort"
 	"time"
+
+	"keepr/config"
 )
 
-// Cleanup removes old backup files from *_old directories
-// Returns the number of files deleted
-func Cleanup(basePath, serverName string, retentionDays int) (int, error) {
-	serverPath := filepath.Join(basePath, serverName)
+// Cleanup removes files older than the retention cutoff from the server's
+// configured backup dirs. Only configured backup_dir roots are touched, so
+// synced data dirs that happen to end in "_old" are never affected.
+// Returns the number of files deleted.
+func Cleanup(basePath string, server config.Server, retentionDays int) (int, error) {
 	cutoff := time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour)
 	deleted := 0
 
-	err := filepath.Walk(serverPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip directories
-		if info.IsDir() {
-			return nil
-		}
-
-		// Only process files in *_old directories
-		dir := filepath.Dir(path)
-		if !strings.HasSuffix(filepath.Base(dir), "_old") {
-			return nil
-		}
-
-		// Delete files older than retention cutoff
-		if info.ModTime().Before(cutoff) {
-			if err := os.Remove(path); err != nil {
+	for _, root := range backupDirs(basePath, server) {
+		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
 				return err
 			}
-			deleted++
-		}
-
-		return nil
-	})
-
-	return deleted, err
-}
-
-// CleanupEmptyDirs removes empty *_old directories
-func CleanupEmptyDirs(basePath, serverName string) error {
-	serverPath := filepath.Join(basePath, serverName)
-
-	return filepath.Walk(serverPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			// Directory might have been deleted already
-			if os.IsNotExist(err) {
+			if info.IsDir() {
 				return nil
 			}
-			return err
-		}
-
-		// Only process directories ending in _old
-		if !info.IsDir() || !strings.HasSuffix(info.Name(), "_old") {
+			if info.ModTime().Before(cutoff) {
+				if err := os.Remove(path); err != nil {
+					return err
+				}
+				deleted++
+			}
 			return nil
+		})
+		if err != nil {
+			return deleted, err
 		}
+	}
 
-		// Check if directory is empty
-		entries, err := os.ReadDir(path)
+	return deleted, nil
+}
+
+// CleanupEmptyDirs removes empty directories inside the server's backup dirs,
+// including the backup dir itself if it ends up empty
+func CleanupEmptyDirs(basePath string, server config.Server) error {
+	for _, root := range backupDirs(basePath, server) {
+		var dirs []string
+		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
+				return err
+			}
+			if info.IsDir() {
+				dirs = append(dirs, path)
+			}
+			return nil
+		})
 		if err != nil {
 			return err
 		}
 
-		if len(entries) == 0 {
-			if err := os.Remove(path); err != nil {
+		// Deepest first so parents emptied by child removal get removed too
+		sort.Slice(dirs, func(i, j int) bool { return len(dirs[i]) > len(dirs[j]) })
+		for _, dir := range dirs {
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
 				return err
 			}
+			if len(entries) == 0 {
+				if err := os.Remove(dir); err != nil {
+					return err
+				}
+			}
 		}
+	}
 
-		return nil
-	})
+	return nil
+}
+
+// backupDirs returns the resolved backup dirs configured for a server
+func backupDirs(basePath string, server config.Server) []string {
+	var dirs []string
+	for _, p := range server.Paths {
+		if p.BackupDir != "" {
+			dirs = append(dirs, ResolvePath(basePath, p.BackupDir))
+		}
+	}
+	return dirs
 }

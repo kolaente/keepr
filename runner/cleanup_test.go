@@ -5,45 +5,38 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"keepr/config"
 )
 
+func writeFileWithAge(t *testing.T, path string, age time.Duration) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("Failed to create dir: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("data"), 0644); err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	mtime := time.Now().Add(-age)
+	if err := os.Chtimes(path, mtime, mtime); err != nil {
+		t.Fatalf("Failed to set file time: %v", err)
+	}
+}
+
+func testServer(paths ...config.Path) config.Server {
+	return config.Server{Name: "testserver", Paths: paths}
+}
+
 func TestCleanup(t *testing.T) {
-	// Create temp directory structure
-	tmpDir, err := os.MkdirTemp("", "cleanup-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	tmpDir := t.TempDir()
+	server := testServer(config.Path{Remote: "/data", Local: "testserver/data", BackupDir: "testserver/data_old"})
 
-	// Create server directory with _old subdirectory
-	serverDir := filepath.Join(tmpDir, "testserver")
-	oldDir := filepath.Join(serverDir, "data_old")
-	if err := os.MkdirAll(oldDir, 0755); err != nil {
-		t.Fatalf("Failed to create old dir: %v", err)
-	}
+	oldFile := filepath.Join(tmpDir, "testserver/data_old/old-file.txt")
+	newFile := filepath.Join(tmpDir, "testserver/data_old/new-file.txt")
+	writeFileWithAge(t, oldFile, 31*24*time.Hour)
+	writeFileWithAge(t, newFile, 1*24*time.Hour)
 
-	// Create old file (31 days ago)
-	oldFile := filepath.Join(oldDir, "old-file.txt")
-	if err := os.WriteFile(oldFile, []byte("old"), 0644); err != nil {
-		t.Fatalf("Failed to create old file: %v", err)
-	}
-	oldTime := time.Now().Add(-31 * 24 * time.Hour)
-	if err := os.Chtimes(oldFile, oldTime, oldTime); err != nil {
-		t.Fatalf("Failed to set old file time: %v", err)
-	}
-
-	// Create new file (1 day ago)
-	newFile := filepath.Join(oldDir, "new-file.txt")
-	if err := os.WriteFile(newFile, []byte("new"), 0644); err != nil {
-		t.Fatalf("Failed to create new file: %v", err)
-	}
-	newTime := time.Now().Add(-1 * 24 * time.Hour)
-	if err := os.Chtimes(newFile, newTime, newTime); err != nil {
-		t.Fatalf("Failed to set new file time: %v", err)
-	}
-
-	// Run cleanup with 30 day retention
-	deleted, err := Cleanup(tmpDir, "testserver", 30)
+	deleted, err := Cleanup(tmpDir, server, 30)
 	if err != nil {
 		t.Fatalf("Cleanup failed: %v", err)
 	}
@@ -51,81 +44,111 @@ func TestCleanup(t *testing.T) {
 	if deleted != 1 {
 		t.Errorf("Expected 1 file deleted, got %d", deleted)
 	}
-
-	// Verify old file is deleted
 	if _, err := os.Stat(oldFile); !os.IsNotExist(err) {
 		t.Error("Old file should be deleted")
 	}
-
-	// Verify new file remains
 	if _, err := os.Stat(newFile); err != nil {
 		t.Error("New file should remain")
 	}
 }
 
-func TestCleanup_NoOldDirs(t *testing.T) {
-	// Create temp directory without _old subdirectories
-	tmpDir, err := os.MkdirTemp("", "cleanup-test")
+func TestCleanup_NestedFiles(t *testing.T) {
+	// rsync --backup-dir mirrors the source tree, so backed up files
+	// usually sit in subdirectories of the backup dir
+	tmpDir := t.TempDir()
+	server := testServer(config.Path{Remote: "/data", Local: "testserver/data", BackupDir: "testserver/data_old"})
+
+	nested := filepath.Join(tmpDir, "testserver/data_old/someapp/config/settings.json")
+	writeFileWithAge(t, nested, 31*24*time.Hour)
+
+	deleted, err := Cleanup(tmpDir, server, 30)
 	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	serverDir := filepath.Join(tmpDir, "testserver")
-	normalDir := filepath.Join(serverDir, "data")
-	if err := os.MkdirAll(normalDir, 0755); err != nil {
-		t.Fatalf("Failed to create dir: %v", err)
+		t.Fatalf("Cleanup failed: %v", err)
 	}
 
-	// Create a file in normal directory
-	normalFile := filepath.Join(normalDir, "file.txt")
-	if err := os.WriteFile(normalFile, []byte("data"), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
+	if deleted != 1 {
+		t.Errorf("Expected 1 file deleted, got %d", deleted)
 	}
-	// Make it old
-	oldTime := time.Now().Add(-31 * 24 * time.Hour)
-	if err := os.Chtimes(normalFile, oldTime, oldTime); err != nil {
-		t.Fatalf("Failed to set file time: %v", err)
+	if _, err := os.Stat(nested); !os.IsNotExist(err) {
+		t.Error("Nested old file should be deleted")
 	}
+}
 
-	// Run cleanup - should not delete files outside _old directories
-	deleted, err := Cleanup(tmpDir, "testserver", 30)
+func TestCleanup_IgnoresSyncedData(t *testing.T) {
+	// Old files in the synced data tree must never be touched,
+	// even in dirs whose name ends in _old
+	tmpDir := t.TempDir()
+	server := testServer(config.Path{Remote: "/data", Local: "testserver/data", BackupDir: "testserver/data_old"})
+
+	dataFile := filepath.Join(tmpDir, "testserver/data/file.txt")
+	trapFile := filepath.Join(tmpDir, "testserver/data/configs_old/file.txt")
+	writeFileWithAge(t, dataFile, 31*24*time.Hour)
+	writeFileWithAge(t, trapFile, 31*24*time.Hour)
+
+	deleted, err := Cleanup(tmpDir, server, 30)
 	if err != nil {
 		t.Fatalf("Cleanup failed: %v", err)
 	}
 
 	if deleted != 0 {
-		t.Errorf("Expected 0 files deleted (not in _old dir), got %d", deleted)
+		t.Errorf("Expected 0 files deleted, got %d", deleted)
 	}
+	if _, err := os.Stat(trapFile); err != nil {
+		t.Error("File in synced data dir ending in _old should remain")
+	}
+}
 
-	// Verify file still exists
-	if _, err := os.Stat(normalFile); err != nil {
-		t.Error("File outside _old dir should remain")
+func TestCleanup_MissingBackupDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	server := testServer(config.Path{Remote: "/data", Local: "testserver/data", BackupDir: "testserver/data_old"})
+
+	deleted, err := Cleanup(tmpDir, server, 30)
+	if err != nil {
+		t.Fatalf("Cleanup should ignore missing backup dirs: %v", err)
+	}
+	if deleted != 0 {
+		t.Errorf("Expected 0 files deleted, got %d", deleted)
 	}
 }
 
 func TestCleanupEmptyDirs(t *testing.T) {
-	// Create temp directory with empty _old subdirectory
-	tmpDir, err := os.MkdirTemp("", "cleanup-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	tmpDir := t.TempDir()
+	server := testServer(config.Path{Remote: "/data", Local: "testserver/data", BackupDir: "testserver/data_old"})
 
-	serverDir := filepath.Join(tmpDir, "testserver")
-	emptyOldDir := filepath.Join(serverDir, "data_old")
-	if err := os.MkdirAll(emptyOldDir, 0755); err != nil {
-		t.Fatalf("Failed to create old dir: %v", err)
+	// Nested empty dirs: removing the child must also empty the parent
+	nestedEmpty := filepath.Join(tmpDir, "testserver/data_old/someapp/logs")
+	if err := os.MkdirAll(nestedEmpty, 0755); err != nil {
+		t.Fatalf("Failed to create dirs: %v", err)
 	}
 
-	// Run cleanup for empty dirs
-	err = CleanupEmptyDirs(tmpDir, "testserver")
-	if err != nil {
+	if err := CleanupEmptyDirs(tmpDir, server); err != nil {
 		t.Fatalf("CleanupEmptyDirs failed: %v", err)
 	}
 
-	// Verify empty _old dir is removed
-	if _, err := os.Stat(emptyOldDir); !os.IsNotExist(err) {
-		t.Error("Empty _old directory should be removed")
+	if _, err := os.Stat(filepath.Join(tmpDir, "testserver/data_old")); !os.IsNotExist(err) {
+		t.Error("Empty backup dir tree should be removed")
+	}
+}
+
+func TestCleanupEmptyDirs_KeepsNonEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	server := testServer(config.Path{Remote: "/data", Local: "testserver/data", BackupDir: "testserver/data_old"})
+
+	kept := filepath.Join(tmpDir, "testserver/data_old/someapp/file.txt")
+	writeFileWithAge(t, kept, time.Hour)
+	empty := filepath.Join(tmpDir, "testserver/data_old/emptyapp")
+	if err := os.MkdirAll(empty, 0755); err != nil {
+		t.Fatalf("Failed to create dir: %v", err)
+	}
+
+	if err := CleanupEmptyDirs(tmpDir, server); err != nil {
+		t.Fatalf("CleanupEmptyDirs failed: %v", err)
+	}
+
+	if _, err := os.Stat(kept); err != nil {
+		t.Error("Non-empty dirs should remain")
+	}
+	if _, err := os.Stat(empty); !os.IsNotExist(err) {
+		t.Error("Empty sibling dir should be removed")
 	}
 }
