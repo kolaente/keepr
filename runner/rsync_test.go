@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"keepr/config"
@@ -18,7 +19,7 @@ func TestBuildRsyncArgs_Local(t *testing.T) {
 		Local:  "/backups/data",
 	}
 
-	args := BuildRsyncArgs(server, path, path.Local)
+	args := BuildRsyncArgs(server, path, path.Local, "")
 
 	// Should have basic flags
 	hasAVZ := false
@@ -61,7 +62,7 @@ func TestBuildRsyncArgs_Remote(t *testing.T) {
 		BackupDir: "/backups/server/data.old",
 	}
 
-	args := BuildRsyncArgs(server, path, path.Local)
+	args := BuildRsyncArgs(server, path, path.Local, path.BackupDir)
 
 	// Check for SSH option
 	hasSSH := false
@@ -140,8 +141,9 @@ func TestCheckRsyncError_OtherExitCodesAreErrors(t *testing.T) {
 	}
 }
 
-func TestBuildRsyncArgs_RelativeBackupDirExcluded(t *testing.T) {
-	// When backup_dir is relative, it should be excluded to prevent recursive backup loops
+func TestBuildRsyncArgs_BackupDirInsideDestinationExcluded(t *testing.T) {
+	// A backup dir inside the destination would be deleted by --delete
+	// and back up into itself, so it must be excluded (anchored)
 	server := config.Server{
 		Name: "remote-server",
 		Type: "remote",
@@ -152,25 +154,23 @@ func TestBuildRsyncArgs_RelativeBackupDirExcluded(t *testing.T) {
 	path := config.Path{
 		Remote:    "/var/data",
 		Local:     "/backups/server/data",
-		BackupDir: "data_old", // Relative path
+		BackupDir: "/backups/server/data/data_old",
 	}
 
-	args := BuildRsyncArgs(server, path, path.Local)
+	args := BuildRsyncArgs(server, path, path.Local, path.BackupDir)
 
-	// Check for exclude flag for relative backup_dir
 	hasExclude := false
 	for _, arg := range args {
-		if arg == "--exclude=**/data_old" {
+		if arg == "--exclude=/data_old" {
 			hasExclude = true
 		}
 	}
 	if !hasExclude {
-		t.Errorf("Expected --exclude=**/data_old flag for relative backup_dir, got args: %v", args)
+		t.Errorf("Expected --exclude=/data_old for backup dir inside destination, got args: %v", args)
 	}
 }
 
-func TestBuildRsyncArgs_AbsoluteBackupDirNotExcluded(t *testing.T) {
-	// When backup_dir is absolute, no exclude is needed
+func TestBuildRsyncArgs_BackupDirOutsideDestinationNotExcluded(t *testing.T) {
 	server := config.Server{
 		Name: "remote-server",
 		Type: "remote",
@@ -181,15 +181,26 @@ func TestBuildRsyncArgs_AbsoluteBackupDirNotExcluded(t *testing.T) {
 	path := config.Path{
 		Remote:    "/var/data",
 		Local:     "/backups/server/data",
-		BackupDir: "/backups/server/data_old", // Absolute path
+		BackupDir: "/backups/server/data_old",
 	}
 
-	args := BuildRsyncArgs(server, path, path.Local)
+	args := BuildRsyncArgs(server, path, path.Local, path.BackupDir)
 
-	// Check that no exclude flag is added for absolute backup_dir
 	for _, arg := range args {
-		if arg == "--exclude=**/data_old" {
-			t.Error("Should not add exclude for absolute backup_dir")
+		if strings.HasPrefix(arg, "--exclude=") {
+			t.Errorf("Should not add exclude for backup dir outside destination, got %s", arg)
 		}
+	}
+}
+
+func TestResolvePath(t *testing.T) {
+	if got := ResolvePath("/backups", "server/data_old"); got != "/backups/server/data_old" {
+		t.Errorf("ResolvePath relative = %q", got)
+	}
+	if got := ResolvePath("/backups", "/elsewhere/data_old"); got != "/elsewhere/data_old" {
+		t.Errorf("ResolvePath absolute = %q", got)
+	}
+	if got := ResolvePath("/backups", ""); got != "" {
+		t.Errorf("ResolvePath empty = %q", got)
 	}
 }

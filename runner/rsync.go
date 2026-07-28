@@ -12,8 +12,8 @@ import (
 )
 
 // BuildRsyncArgs builds the rsync command arguments for a given server and path.
-// The localPath parameter should be the resolved absolute path for the destination.
-func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []string {
+// localPath and backupDir must be resolved absolute paths (backupDir may be empty).
+func BuildRsyncArgs(server config.Server, path config.Path, localPath, backupDir string) []string {
 	args := []string{"-avz", "--no-group"}
 
 	// For remote servers, add SSH options
@@ -30,14 +30,13 @@ func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []
 	}
 
 	// Handle backup directory option
-	if path.BackupDir != "" {
-		args = append(args, "-b", "--backup-dir="+path.BackupDir)
-		// Exclude backup directory from sync to prevent recursive backup loops
-		// When backup_dir is relative, it's inside the destination and would get
-		// backed up into itself on subsequent runs (e.g., data_old/data_old/data_old/...)
-		// Use **/ prefix to match at any depth in case nesting already occurred
-		if !filepath.IsAbs(path.BackupDir) {
-			args = append(args, "--exclude=**/"+filepath.Base(path.BackupDir))
+	if backupDir != "" {
+		args = append(args, "-b", "--backup-dir="+backupDir)
+		// If backup dir lies inside the destination, --delete would remove it
+		// (it doesn't exist on the source) and it would back up into itself.
+		// Exclude it, anchored to the transfer root so nothing else matches.
+		if rel, err := filepath.Rel(localPath, backupDir); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			args = append(args, "--exclude=/"+rel)
 		}
 	}
 
@@ -54,15 +53,22 @@ func BuildRsyncArgs(server config.Server, path config.Path, localPath string) []
 	return args
 }
 
+// ResolvePath joins a config path with basePath unless it is already absolute
+func ResolvePath(basePath, p string) string {
+	if p == "" || filepath.IsAbs(p) {
+		return p
+	}
+	return filepath.Join(basePath, p)
+}
+
 // RunRsync executes rsync for a server/path pair and streams output to logFn
 func RunRsync(ctx context.Context, server config.Server, path config.Path, basePath string, logFn LogFunc) error {
-	// Resolve local path: if not absolute, join with basePath
-	localPath := path.Local
-	if !filepath.IsAbs(localPath) {
-		localPath = filepath.Join(basePath, localPath)
-	}
+	localPath := ResolvePath(basePath, path.Local)
+	// Resolve backup dir too: rsync treats a relative --backup-dir as relative
+	// to the *destination*, which nests it inside the synced tree
+	backupDir := ResolvePath(basePath, path.BackupDir)
 
-	args := BuildRsyncArgs(server, path, localPath)
+	args := BuildRsyncArgs(server, path, localPath, backupDir)
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(localPath)
